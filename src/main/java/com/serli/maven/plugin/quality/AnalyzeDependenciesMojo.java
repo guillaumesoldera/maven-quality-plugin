@@ -37,9 +37,9 @@ import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 /**
  * Goal which touches a timestamp file.
  * 
- * @goal touch
- * 
- * @phase process-sources
+ * @goal analyze-dependencies
+ * @requiresDependencyResolution test
+ * @phase verify
  */
 public class AnalyzeDependenciesMojo extends AbstractMojo {
 
@@ -158,7 +158,8 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     }
 
     if (outputXML) {
-      writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared);
+      StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared);
+      writeFile(dependenciesResult.toString());
     } else {
       if (!usedDeclared.isEmpty()) {
         getLog().info("Used declared dependencies found:");
@@ -214,10 +215,6 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
   private PrettyPrintXMLWriter writeDependencyXML(Set artifacts, PrettyPrintXMLWriter writer) {
     if (!artifacts.isEmpty()) {
-      getLog().info("Add the following to your pom to correct the missing dependencies: ");
-
-      // StringWriter out = new StringWriter();
-      // PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter(out);
 
       Iterator iter = artifacts.iterator();
       while (iter.hasNext()) {
@@ -246,7 +243,6 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
         writer.endElement();
       }
 
-      // getLog().info("\n" + out.getBuffer());
     }
     return writer;
   }
