@@ -35,7 +35,7 @@ import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzerExce
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 
 /**
- * Goal which touches a timestamp file.
+ * Goal which analyzes pom dependencies.
  * 
  * @goal analyze-dependencies
  * @requiresDependencyResolution test
@@ -98,6 +98,9 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private boolean outputXML;
 
   public void execute() throws MojoExecutionException {
+    // TODO regarder si les dependances surchargent le distributionManagement d'un parent
+    
+    
     File f = outputDirectory;
 
     if (!f.exists()) {
