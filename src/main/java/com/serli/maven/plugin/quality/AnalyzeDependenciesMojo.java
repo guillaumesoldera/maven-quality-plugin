@@ -47,7 +47,7 @@ import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
  * 
  * @goal analyze-dependencies
  * @requiresDependencyResolution test
- * @phase verify
+ * @execute phase="test-compile"
  */
 public class AnalyzeDependenciesMojo extends AbstractMojo {
 
