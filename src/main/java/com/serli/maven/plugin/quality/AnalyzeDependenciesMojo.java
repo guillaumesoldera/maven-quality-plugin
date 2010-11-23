@@ -161,11 +161,8 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     }
 
     Set usedDeclared = analysis.getUsedDeclaredArtifacts();
-    getLog().info("usedDeclared " + usedDeclared.size());
     Set usedUndeclared = analysis.getUsedUndeclaredArtifacts();
-    getLog().info("usedUndeclared " + usedUndeclared.size());
     Set unusedDeclared = analysis.getUnusedDeclaredArtifacts();
-    getLog().info("unusedDeclared " + unusedDeclared.size());
 
     if (ignoreNonCompile) {
       Set filteredUnusedDeclared = new HashSet(unusedDeclared);
@@ -185,9 +182,9 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     }
 
     MismatchDepMgtModel mismatchDepMgtModel = null;
-//    if (analyzeDepMgt) {
-//      mismatchDepMgtModel = checkDependencyManagement();
-//    }
+    if (analyzeDepMgt) {
+      mismatchDepMgtModel = checkDependencyManagement();
+    }
 
     if (outputXML) {
       StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel);
@@ -447,7 +444,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   }
 
   private PrettyPrintXMLWriter writeExclusionErrors(List exclusionErrors, PrettyPrintXMLWriter writer) {
-    if (exclusionErrors != null && exclusionErrors.size() > 0) {
+    if (exclusionErrors != null) {
       writer.startElement("exclusionErrors");
       Iterator exclusionIter = exclusionErrors.iterator();
       while (exclusionIter.hasNext()) {
@@ -482,7 +479,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   }
 
   private PrettyPrintXMLWriter writeMismatch(Map mismatch, PrettyPrintXMLWriter writer) {
-    if (mismatch != null && mismatch.size() > 0) {
+    if (mismatch != null) {
       writer.startElement("overridenVersions");
       Iterator mismatchIter = mismatch.keySet().iterator();
       while (mismatchIter.hasNext()) {
