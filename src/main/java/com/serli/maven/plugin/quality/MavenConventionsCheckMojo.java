@@ -81,6 +81,10 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
   private MavenProject project;
   
   public void execute() throws MojoExecutionException, MojoFailureException {
+    
+    //TODO regarder l'ordre des tags et le formattage
+    // TODO regarder le respect des conventions de nommage
+    
     getLog().info("execute");
     File pom = new File("pom.xml");
     FileReader reader;
