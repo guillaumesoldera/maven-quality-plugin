@@ -121,8 +121,11 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
   public void execute() throws MojoExecutionException {
 
+    //TODO regarder si une même dépendance est déclarée plusieurs fois
+    //TODO regarder si les dépendances sont triées. (bonne pratique : groupée par groupId ou par scope)
+    
     File f = outputDirectory;
-
+    
     if (!f.exists()) {
       f.mkdirs();
     }
