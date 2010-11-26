@@ -18,6 +18,7 @@ public class LicenseMojo extends AbstractMojo {
     // TODO extends de AbstractLicenseMojo, mais ecrire dans un fichier les 'missingHeader'
 
     // TODO voir aussi le project-info pour avoir les licenses des dependances (determiner la compatibilite des licenses ?)
+    // TODO voir comment ils gerent avec le DependenciesRenderer : http://svn.apache.org/viewvc/maven/plugins/tags/maven-project-info-reports-plugin-2.2/src/main/java/org/apache/maven/report/projectinfo/dependencies/renderer/DependenciesRenderer.java?view=markup
 
   }
 
