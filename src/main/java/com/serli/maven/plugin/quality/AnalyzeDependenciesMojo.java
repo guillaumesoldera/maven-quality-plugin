@@ -120,9 +120,13 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private boolean outputXML;
 
   public void execute() throws MojoExecutionException {
-
-    //TODO regarder si une même dépendance est déclarée plusieurs fois
-    //TODO regarder si les dépendances sont triées. (bonne pratique : groupée par groupId ou par scope)
+    // TODO ajouter dans le fichier resultat le numero de ligne de la dependance
+    
+    buildDependenciesLineStructure();
+    //TODO regarder si une mï¿½me dï¿½pendance est dï¿½clarï¿½e plusieurs fois
+    checkUniqueDeclaration();
+ 
+    //TODO regarder si les dï¿½pendances sont triï¿½es. (bonne pratique : groupï¿½e par groupId ou par scope)
     
     File f = outputDirectory;
     
@@ -154,6 +158,29 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   }
 
   // private methods --------------------------------------------------------
+
+ private void buildDependenciesLineStructure() {
+   // TODO instancier un Reader pour parser uniquement les dependances (regarder dans la balise <dependencies> a la racine)
+    // sauvegarder l'ensemble des dependances dans une structure avec le numero des lignes
+ }
+
+ private void checkUniqueDeclaration() {
+  
+
+ // parcourir la structure a la recherche de la definition multiple d'une meme dependance (recherche sur groupId:artifactId)
+ // remplir une structure pour sauvegarder dans le fichier resultat dependencies.xml sous la forme
+ // <multipleDeclarations>
+ //    <dependency>
+ //       <groupId></groupId>
+ //       <artifactId></artifactId>
+ //         <declarations>
+ //            <declarationLine></declarationLine>
+ //            <declarationLine></declarationLine>
+ //         </declarations>
+ //    </dependency>
+ // </multipleDeclarations>
+ }
+
 
   private boolean checkDependencies() throws MojoExecutionException, IOException {
     ProjectDependencyAnalysis analysis;
