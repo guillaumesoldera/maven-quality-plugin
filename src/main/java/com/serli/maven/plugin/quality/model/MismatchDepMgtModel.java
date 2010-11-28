@@ -1,4 +1,4 @@
-package com.serli.maven.plugin.quality;
+package com.serli.maven.plugin.quality.model;
 
 import java.util.List;
 import java.util.Map;

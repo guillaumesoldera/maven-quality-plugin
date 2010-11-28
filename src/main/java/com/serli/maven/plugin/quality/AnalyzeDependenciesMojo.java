@@ -18,6 +18,7 @@ package com.serli.maven.plugin.quality;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -41,6 +42,12 @@ import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzer;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzerException;
 import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
+import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+
+import com.serli.maven.plugin.quality.model.DependencyLocation;
+import com.serli.maven.plugin.quality.model.MismatchDepMgtModel;
+import com.serli.maven.plugin.quality.parser.PomFileReader;
+import com.serli.maven.plugin.quality.util.Util;
 
 /**
  * Goal which analyzes pom dependencies.
@@ -106,6 +113,13 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private boolean analyzeDepMgt;
 
   /**
+   * Check for unique dependency declaration.
+   * 
+   * @parameter expression="${uniqueDeclaration}" default-value="true"
+   */
+  private boolean uniqueDeclaration;
+
+  /**
    * Ignore Direct Dependency Overrides of dependencyManagement section.
    * 
    * @parameter expression="${ignoreDirect}" default-value="false"
@@ -119,17 +133,18 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    */
   private boolean outputXML;
 
+  /**
+   * Structure which contains dependencies and line number where the dependency is declared in pom file.
+   */
+  private List<DependencyLocation> dependencyLocationList;
+
   public void execute() throws MojoExecutionException {
-    // TODO ajouter dans le fichier resultat le numero de ligne de la dependance
-    
-    buildDependenciesLineStructure();
-    //TODO regarder si une mï¿½me dï¿½pendance est dï¿½clarï¿½e plusieurs fois
-    checkUniqueDeclaration();
- 
-    //TODO regarder si les dï¿½pendances sont triï¿½es. (bonne pratique : groupï¿½e par groupId ou par scope)
-    
+
+    // TODO regarder si les dépendances sont triées. (bonne pratique : groupée
+    // par groupId ou par scope)
+
     File f = outputDirectory;
-    
+
     if (!f.exists()) {
       f.mkdirs();
     }
@@ -146,6 +161,10 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
     boolean warningDep;
     try {
+      // build structure which associates dependency and line number in pom
+      // file.
+      dependencyLocationList = buildDependenciesLineStructure();
+
       warningDep = checkDependencies();
 
       if (warningDep && failOnWarning) {
@@ -153,35 +172,57 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       }
     } catch (IOException e) {
       throw new MojoExecutionException("Analyze problem", e);
+    } catch (XmlPullParserException e) {
+      throw new MojoExecutionException("Analyze problem", e);
     }
 
   }
 
   // private methods --------------------------------------------------------
 
- private void buildDependenciesLineStructure() {
-   // TODO instancier un Reader pour parser uniquement les dependances (regarder dans la balise <dependencies> a la racine)
-    // sauvegarder l'ensemble des dependances dans une structure avec le numero des lignes
- }
+  private List<DependencyLocation> buildDependenciesLineStructure() throws XmlPullParserException, IOException {
+    PomFileReader pomFileReader = new PomFileReader(getLog());
+    File pom = new File("pom.xml");
+    FileReader reader;
 
- private void checkUniqueDeclaration() {
-  
+    reader = new FileReader(pom);
+    List<DependencyLocation> buildDependencyLineStructure = pomFileReader.buildDependencyLineStructure(reader);
+    getLog().info("taille de la structure : " + buildDependencyLineStructure.size());
+    return buildDependencyLineStructure;
+  }
 
- // parcourir la structure a la recherche de la definition multiple d'une meme dependance (recherche sur groupId:artifactId)
- // remplir une structure pour sauvegarder dans le fichier resultat dependencies.xml sous la forme
- // <multipleDeclarations>
- //    <dependency>
- //       <groupId></groupId>
- //       <artifactId></artifactId>
- //         <declarations>
- //            <declarationLine></declarationLine>
- //            <declarationLine></declarationLine>
- //         </declarations>
- //    </dependency>
- // </multipleDeclarations>
- }
+  /**
+   * Check if a dependency is declared many times in looking for in List<DependencyLocation> structure built before.
+   * @see #buildDependenciesLineStructure()
+   * @return Map contains dependency and lines where this dependency is declared many times.
+   */
+  private Map<Dependency, List<Integer>> checkUniqueDeclaration() {
 
+    Map<Dependency, List<Integer>> multipleDefinitions = new HashMap<Dependency, List<Integer>>();
+    for (DependencyLocation dependencyLocation : dependencyLocationList) {
+      Dependency depDefined = dependencyLocation.getDependency();
+      boolean alreadyCheck = false;
+      
+      // we looks if this dependency is not already checked and put in result map.
+      for (Dependency dep : multipleDefinitions.keySet()) {
+        if (dep.getGroupId().equals(depDefined.getGroupId()) && dep.getArtifactId().equals(depDefined.getArtifactId())) {
+          alreadyCheck = true;
+          break;
+        }
+      }
 
+      if (!alreadyCheck) {
+        List<Integer> definitionsLine = Util.getDefinitionsLine(dependencyLocationList, dependencyLocation.getDependency());
+        if (definitionsLine.size() > 1) {
+          multipleDefinitions.put(dependencyLocation.getDependency(), definitionsLine);
+        }
+      }
+    }
+
+    return multipleDefinitions;
+  }
+
+  @SuppressWarnings("unchecked")
   private boolean checkDependencies() throws MojoExecutionException, IOException {
     ProjectDependencyAnalysis analysis;
     try {
@@ -190,15 +231,15 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       throw new MojoExecutionException("Cannot analyze dependencies", exception);
     }
 
-    Set usedDeclared = analysis.getUsedDeclaredArtifacts();
-    Set usedUndeclared = analysis.getUsedUndeclaredArtifacts();
-    Set unusedDeclared = analysis.getUnusedDeclaredArtifacts();
+    Set<Artifact> usedDeclared = analysis.getUsedDeclaredArtifacts();
+    Set<Artifact> usedUndeclared = analysis.getUsedUndeclaredArtifacts();
+    Set<Artifact> unusedDeclared = analysis.getUnusedDeclaredArtifacts();
 
     if (ignoreNonCompile) {
-      Set filteredUnusedDeclared = new HashSet(unusedDeclared);
-      Iterator iter = filteredUnusedDeclared.iterator();
+      Set<Artifact> filteredUnusedDeclared = new HashSet<Artifact>(unusedDeclared);
+      Iterator<Artifact> iter = filteredUnusedDeclared.iterator();
       while (iter.hasNext()) {
-        Artifact artifact = (Artifact) iter.next();
+        Artifact artifact = iter.next();
         if (!artifact.getScope().equals(Artifact.SCOPE_COMPILE)) {
           iter.remove();
         }
@@ -211,13 +252,19 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       return false;
     }
 
-    MismatchDepMgtModel mismatchDepMgtModel = null;
+    Map<Dependency, List<Integer>> checkUniqueDeclaration = null;
+    if (uniqueDeclaration) {
+      checkUniqueDeclaration = checkUniqueDeclaration();
+    }
+
+    MismatchDepMgtModel mismatchDepMgtModel = new MismatchDepMgtModel();
     if (analyzeDepMgt) {
       mismatchDepMgtModel = checkDependencyManagement();
     }
 
     if (outputXML) {
-      StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel);
+      StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
+          checkUniqueDeclaration);
       writeFile(dependenciesResult.toString());
     } else {
       if (!usedDeclared.isEmpty()) {
@@ -236,7 +283,16 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     }
 
     boolean hasMismatch = (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched());
-    return !usedUndeclared.isEmpty() || !unusedDeclared.isEmpty() | hasMismatch;
+    boolean multipleDeclaration = checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty();
+
+    boolean result = !usedUndeclared.isEmpty() || !unusedDeclared.isEmpty();
+    if (analyzeDepMgt) {
+      result = result || hasMismatch;
+    }
+    if (uniqueDeclaration) {
+      result = result || multipleDeclaration;
+    }
+    return result;
   }
 
   /**
@@ -252,7 +308,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     List exclusionErrors = null;
     getLog().info("Found Resolved Dependency / DependencyManagement mismatches:");
 
-    List depMgtDependencies = null;
+    List<Dependency> depMgtDependencies = null;
 
     DependencyManagement depMgt = project.getDependencyManagement();
     if (depMgt != null) {
@@ -261,11 +317,11 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
     if (depMgtDependencies != null && !depMgtDependencies.isEmpty()) {
       // put all the dependencies from depMgt into a map for quick lookup
-      Map depMgtMap = new HashMap();
-      Map exclusions = new HashMap();
-      Iterator iter = depMgtDependencies.iterator();
+      Map<String, Dependency> depMgtMap = new HashMap<String, Dependency>();
+      Map<String, Exclusion> exclusions = new HashMap<String, Exclusion>();
+      Iterator<Dependency> iter = depMgtDependencies.iterator();
       while (iter.hasNext()) {
-        Dependency depMgtDependency = (Dependency) iter.next();
+        Dependency depMgtDependency = iter.next();
         depMgtMap.put(depMgtDependency.getManagementKey(), depMgtDependency);
 
         // now put all the exclusions into a map for quick lookup
@@ -273,7 +329,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       }
 
       // get dependencies for the project (including transitive)
-      Set allDependencyArtifacts = new HashSet(project.getArtifacts());
+      Set<Artifact> allDependencyArtifacts = new HashSet<Artifact>(project.getArtifacts());
 
       // don't warn if a dependency that is directly listed overrides
       // depMgt. That's ok.
@@ -285,15 +341,16 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
       // log exclusion errors
       exclusionErrors = getExclusionErrors(exclusions, allDependencyArtifacts);
-      if (exclusionErrors!= null && exclusionErrors.size() > 0) {
-        foundError = true;        
+      if (exclusionErrors != null && exclusionErrors.size() > 0) {
+        foundError = true;
       }
-//      while (exclusionIter.hasNext()) {
-//        Artifact exclusion = (Artifact) exclusionIter.next();
-//        getLog().info(
-//            StringUtils.stripEnd(getArtifactManagementKey(exclusion), ":") + " was excluded in DepMgt, but version "
-//                + exclusion.getVersion() + " has been found in the dependency tree.");
-//      }
+      // while (exclusionIter.hasNext()) {
+      // Artifact exclusion = (Artifact) exclusionIter.next();
+      // getLog().info(
+      // StringUtils.stripEnd(getArtifactManagementKey(exclusion), ":") +
+      // " was excluded in DepMgt, but version "
+      // + exclusion.getVersion() + " has been found in the dependency tree.");
+      // }
 
       // find and log version mismatches
       mismatch = getMismatch(depMgtMap, allDependencyArtifacts);
@@ -318,12 +375,12 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     return mismatchDepMgtModel;
   }
 
-  private void logArtifacts(Set artifacts, boolean warn) throws IOException {
+  private void logArtifacts(Set<Artifact> artifacts, boolean warn) throws IOException {
     if (artifacts.isEmpty()) {
       writeFile("   None");
     } else {
-      for (Iterator iterator = artifacts.iterator(); iterator.hasNext();) {
-        Artifact artifact = (Artifact) iterator.next();
+      for (Iterator<Artifact> iterator = artifacts.iterator(); iterator.hasNext();) {
+        Artifact artifact = iterator.next();
 
         // called because artifact will set the version to -SNAPSHOT only if I
         // do this. MNG-2961
@@ -344,12 +401,12 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    * @return a map of the exclusions using the Dependency ManagementKey as the
    *         keyset.
    */
-  public Map addExclusions(List exclusionList) {
-    Map exclusions = new HashMap();
+  public Map<String, Exclusion> addExclusions(List<Exclusion> exclusionList) {
+    Map<String, Exclusion> exclusions = new HashMap<String, Exclusion>();
     if (exclusionList != null) {
-      Iterator exclusionIter = exclusionList.iterator();
+      Iterator<Exclusion> exclusionIter = exclusionList.iterator();
       while (exclusionIter.hasNext()) {
-        Exclusion exclusion = (Exclusion) exclusionIter.next();
+        Exclusion exclusion = exclusionIter.next();
         exclusions.put(getExclusionKey(exclusion), exclusion);
       }
     }
@@ -367,10 +424,10 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    *          resolved artifacts to be compared.
    * @return list of artifacts that should have been excluded.
    */
-  public List getExclusionErrors(Map exclusions, Set allDependencyArtifacts) {
-    List list = new ArrayList();
+  public List<Artifact> getExclusionErrors(Map exclusions, Set<Artifact> allDependencyArtifacts) {
+    List<Artifact> list = new ArrayList<Artifact>();
 
-    Iterator iter = allDependencyArtifacts.iterator();
+    Iterator<Artifact> iter = allDependencyArtifacts.iterator();
     while (iter.hasNext()) {
       Artifact artifact = (Artifact) iter.next();
       if (exclusions.containsKey(getExclusionKey(artifact))) {
@@ -401,10 +458,10 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    * @return a map containing the resolved artifact as the key and the listed
    *         dependency as the value.
    */
-  public Map getMismatch(Map depMgtMap, Set allDependencyArtifacts) {
-    Map mismatchMap = new HashMap();
+  public Map<Artifact, Dependency> getMismatch(Map depMgtMap, Set<Artifact> allDependencyArtifacts) {
+    Map<Artifact, Dependency> mismatchMap = new HashMap<Artifact, Dependency>();
 
-    Iterator iter = allDependencyArtifacts.iterator();
+    Iterator<Artifact> iter = allDependencyArtifacts.iterator();
     while (iter.hasNext()) {
       Artifact dependencyArtifact = (Artifact) iter.next();
       Dependency depFromDepMgt = (Dependency) depMgtMap.get(getArtifactManagementKey(dependencyArtifact));
@@ -432,7 +489,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    * 
    */
   public void logMismatch(Artifact dependencyArtifact, Dependency dependencyFromDepMgt) {
-        getLog().info("\tDependency: " + StringUtils.stripEnd(dependencyFromDepMgt.getManagementKey(), ":"));
+    getLog().info("\tDependency: " + StringUtils.stripEnd(dependencyFromDepMgt.getManagementKey(), ":"));
     getLog().info("\t\tDepMgt  : " + dependencyFromDepMgt.getVersion());
     getLog().info("\t\tResolved: " + dependencyArtifact.getBaseVersion());
   }
@@ -449,19 +506,19 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
         + ((artifact.getClassifier() != null) ? ":" + artifact.getClassifier() : "");
   }
 
-  private StringBuffer writeDependenciesResult(Set usedDeclared, Set unusedDeclared, Set usedUndeclared,
-      MismatchDepMgtModel mismatchDepMgtModel) {
+  private StringBuffer writeDependenciesResult(Set<Artifact> usedDeclared, Set<Artifact> unusedDeclared, Set<Artifact> usedUndeclared,
+      MismatchDepMgtModel mismatchDepMgtModel, Map<Dependency, List<Integer>> checkUniqueDeclaration) {
     StringWriter out = new StringWriter();
     PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter(out);
     writer.startElement("dependencies");
     writer.startElement("usedDeclared");
-    writer = writeDependencyXML(usedDeclared, writer);
+    writer = writeDependencyXML(usedDeclared, writer, true);
     writer.endElement();
     writer.startElement("unusedDeclared");
-    writer = writeDependencyXML(unusedDeclared, writer);
+    writer = writeDependencyXML(unusedDeclared, writer, true);
     writer.endElement();
     writer.startElement("usedUndeclared");
-    writer = writeDependencyXML(usedUndeclared, writer);
+    writer = writeDependencyXML(usedUndeclared, writer, false);
     writer.endElement();
 
     if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched()) {
@@ -469,14 +526,50 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       writer = writeExclusionErrors(mismatchDepMgtModel.getExclusionErrors(), writer);
     }
 
+    if (checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty()) {
+      writer = writeMultipleDeclaration(checkUniqueDeclaration, writer);
+    }
+
     writer.endElement();
     return out.getBuffer();
   }
 
-  private PrettyPrintXMLWriter writeExclusionErrors(List exclusionErrors, PrettyPrintXMLWriter writer) {
+  private PrettyPrintXMLWriter writeMultipleDeclaration(Map<Dependency, List<Integer>> checkUniqueDeclaration, PrettyPrintXMLWriter writer) {
+    if (checkUniqueDeclaration != null) {
+      writer.startElement("multipleDeclaration");
+      for (Dependency dep : checkUniqueDeclaration.keySet()) {
+        writer = writeMultipleDeclaration(dep, checkUniqueDeclaration.get(dep), writer);
+      }
+      writer.endElement();
+    }
+
+    return writer;
+  }
+
+  private PrettyPrintXMLWriter writeMultipleDeclaration(Dependency dep, List<Integer> list, PrettyPrintXMLWriter writer) {
+    writer.startElement("dependency");
+    writer.startElement("groupId");
+    writer.writeText(dep.getGroupId());
+    writer.endElement();
+    writer.startElement("artifactId");
+    writer.writeText(dep.getArtifactId());
+    writer.endElement();
+    writer.startElement("declarations");
+    for (Integer i : list) {
+      writer.startElement("declarationLine");
+      writer.writeText(i.toString());
+      writer.endElement();
+    }
+    writer.endElement();
+    writer.endElement();
+
+    return writer;
+  }
+
+  private PrettyPrintXMLWriter writeExclusionErrors(List<Artifact> exclusionErrors, PrettyPrintXMLWriter writer) {
     if (exclusionErrors != null) {
       writer.startElement("exclusionErrors");
-      Iterator exclusionIter = exclusionErrors.iterator();
+      Iterator<Artifact> exclusionIter = exclusionErrors.iterator();
       while (exclusionIter.hasNext()) {
         Artifact exclusion = (Artifact) exclusionIter.next();
         writer = writeExclusionError(writer, exclusion);
@@ -511,22 +604,23 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private PrettyPrintXMLWriter writeMismatch(Map mismatch, PrettyPrintXMLWriter writer) {
     if (mismatch != null) {
       writer.startElement("overridenVersions");
-      Iterator mismatchIter = mismatch.keySet().iterator();
+      Iterator<Artifact> mismatchIter = mismatch.keySet().iterator();
       while (mismatchIter.hasNext()) {
         Artifact resolvedArtifact = (Artifact) mismatchIter.next();
         Dependency depMgtDependency = (Dependency) mismatch.get(resolvedArtifact);
-        writer = writeMismatch(resolvedArtifact, depMgtDependency, writer);
+        writer = writeMismatch(resolvedArtifact, depMgtDependency, writer, true);
       }
       writer.endElement();
     }
     return writer;
   }
 
-  private PrettyPrintXMLWriter writeMismatch(Artifact resolvedArtifact, Dependency depMgtDependency, PrettyPrintXMLWriter writer) {
+  private PrettyPrintXMLWriter writeMismatch(Artifact resolvedArtifact, Dependency depMgtDependency, PrettyPrintXMLWriter writer,
+      boolean printLineNumber) {
     if (resolvedArtifact == null || depMgtDependency == null) {
       return writer;
     }
-    logMismatch( resolvedArtifact, depMgtDependency );
+    logMismatch(resolvedArtifact, depMgtDependency);
     writer.startElement("dependency");
     writer.startElement("groupId");
     writer.writeText(depMgtDependency.getGroupId());
@@ -540,14 +634,25 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     writer.startElement("versionResolved");
     writer.writeText(resolvedArtifact.getBaseVersion());
     writer.endElement();
+
+    if (printLineNumber) {
+      if (printLineNumber) {
+        writer.startElement("lineNumber");
+        int lastDefinitionLine = Util.getLastDefinitionLine(dependencyLocationList, resolvedArtifact.getGroupId(),
+            resolvedArtifact.getArtifactId());
+        writer.writeText(lastDefinitionLine + "");
+        writer.endElement();
+      }
+    }
+
     writer.endElement();
     return writer;
   }
 
-  private PrettyPrintXMLWriter writeDependencyXML(Set artifacts, PrettyPrintXMLWriter writer) {
+  private PrettyPrintXMLWriter writeDependencyXML(Set<Artifact> artifacts, PrettyPrintXMLWriter writer, boolean printLineNumber) {
     if (!artifacts.isEmpty()) {
 
-      Iterator iter = artifacts.iterator();
+      Iterator<Artifact> iter = artifacts.iterator();
       while (iter.hasNext()) {
         Artifact artifact = (Artifact) iter.next();
 
@@ -569,6 +674,12 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
         if (!Artifact.SCOPE_COMPILE.equals(artifact.getScope())) {
           writer.startElement("scope");
           writer.writeText(artifact.getScope());
+          writer.endElement();
+        }
+        if (printLineNumber) {
+          writer.startElement("lineNumber");
+          int lastDefinitionLine = Util.getLastDefinitionLine(dependencyLocationList, artifact.getGroupId(), artifact.getArtifactId());
+          writer.writeText(lastDefinitionLine + "");
           writer.endElement();
         }
         writer.endElement();

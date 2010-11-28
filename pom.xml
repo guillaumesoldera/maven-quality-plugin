@@ -14,21 +14,22 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.version>2.0.9</maven.version>
+<!--		<maven.version>2.2.1</maven.version>-->
 	</properties>
 
 	<dependencies>
-	
+
 		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-plugin-api</artifactId>
 			<version>${maven.version}</version>
 		</dependency>
-		
+
 		<dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-project</artifactId>
-      <version>${maven.version}</version>
-    </dependency>
+			<groupId>org.apache.maven</groupId>
+			<artifactId>maven-project</artifactId>
+			<version>${maven.version}</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.apache.maven.shared</groupId>
@@ -46,22 +47,32 @@
 
 	<build>
 		<plugins>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-plugin-plugin</artifactId>
-				<version>2.5.1</version>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.0.2</version>
 				<configuration>
-					<goalPrefix>maven-quality-plugin</goalPrefix>
+					<source>1.5</source>
+					<target>1.5</target>
 				</configuration>
-				<executions>
-					<execution>
-						<id>generated-helpmojo</id>
-						<goals>
-							<goal>helpmojo</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
+<!--			<plugin>-->
+<!--				<groupId>org.apache.maven.plugins</groupId>-->
+<!--				<artifactId>maven-plugin-plugin</artifactId>-->
+<!--				<version>2.5.1</version>-->
+<!--				<configuration>-->
+<!--					<goalPrefix>maven-quality-plugin</goalPrefix>-->
+<!--				</configuration>-->
+<!--				<executions>-->
+<!--					<execution>-->
+<!--						<id>generated-helpmojo</id>-->
+<!--						<goals>-->
+<!--							<goal>helpmojo</goal>-->
+<!--						</goals>-->
+<!--					</execution>-->
+<!--				</executions>-->
+<!--			</plugin>-->
 		</plugins>
 	</build>
 </project>
