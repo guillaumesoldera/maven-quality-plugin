@@ -1,4 +1,4 @@
-package com.serli.maven.plugin.quality;
+package com.serli.maven.plugin.quality.mojo;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;

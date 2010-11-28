@@ -57,18 +57,22 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParser;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 import com.serli.maven.plugin.quality.model.DependencyLocation;
+import com.serli.maven.plugin.quality.model.StructureConventionsViolation;
+import com.serli.maven.plugin.quality.model.jaxb.MavenConventions;
+import com.serli.maven.plugin.quality.util.Util;
 
+/**
+ * Based on MavenXpp3Reader.class
+ * 
+ * @author Guillaume
+ * 
+ */
 public class PomFileReader {
 
   /**
    * Logger.
    */
   private Log log;
-
-  /**
-   * Contains all tags in good order.
-   */
-  private List tagsList;
 
   public Log getLog() {
     return log;
@@ -1463,361 +1467,84 @@ public class PomFileReader {
    * @param strict
    * @param parser
    */
-  private Model parseModel(String tagName, XmlPullParser parser, boolean strict, String encoding) throws IOException,
-      XmlPullParserException {
-
+  private List<StructureConventionsViolation> parseModel(String tagName, XmlPullParser parser, boolean strict, String encoding,
+      boolean checkSkipLine, boolean checkTabSpaced, MavenConventions mavenConventions) throws IOException, XmlPullParserException {
+    List<StructureConventionsViolation> listStructureConventionsViolations = new ArrayList<StructureConventionsViolation>();
     Model model = new Model();
     model.setModelEncoding(encoding);
-    java.util.Set<String> parsed = new java.util.HashSet<String>();
     int eventType = parser.getEventType();
-    boolean foundRoot = false;
+    String previousTag = null;
+    int previousTagLineNumber = -1;
+    int linePreviousTagEnd = -1;
     while (eventType != XmlPullParser.END_DOCUMENT) {
       if (eventType == XmlPullParser.START_TAG) {
+        StructureConventionsViolation structureConventionsViolation = null;
         if (parser.getName().equals(tagName)) {
-          foundRoot = true;
-        } else if (parser.getName().equals("parent")) {
-          // if ( parsed.contains( "parent" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "parent" );
-          // model.setParent( parseParent( "parent", parser, strict, encoding )
-          // );
-        } else if (parser.getName().equals("modelVersion")) {
-          // if ( parsed.contains( "modelVersion" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "modelVersion" );
-          // model.setModelVersion( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("groupId")) {
-          // if ( parsed.contains( "groupId" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "groupId" );
-          // model.setGroupId( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("artifactId")) {
-          // if ( parsed.contains( "artifactId" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "artifactId" );
-          // model.setArtifactId( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("packaging")) {
-          // if ( parsed.contains( "packaging" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "packaging" );
-          // model.setPackaging( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("name")) {
-          // if ( parsed.contains( "name" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "name" );
-          // model.setName( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("version")) {
-          // if ( parsed.contains( "version" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "version" );
-          // model.setVersion( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("description")) {
-          // if ( parsed.contains( "description" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "description" );
-          // model.setDescription( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("url")) {
-          // if ( parsed.contains( "url" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "url" );
-          // model.setUrl( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("prerequisites")) {
-          // if ( parsed.contains( "prerequisites" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "prerequisites" );
-          // model.setPrerequisites( parsePrerequisites( "prerequisites",
-          // parser, strict, encoding ) );
-        } else if (parser.getName().equals("issueManagement")) {
-          // if ( parsed.contains( "issueManagement" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "issueManagement" );
-          // model.setIssueManagement( parseIssueManagement( "issueManagement",
-          // parser, strict, encoding ) );
-        } else if (parser.getName().equals("ciManagement")) {
-          // if ( parsed.contains( "ciManagement" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "ciManagement" );
-          // model.setCiManagement( parseCiManagement( "ciManagement", parser,
-          // strict, encoding ) );
-        } else if (parser.getName().equals("inceptionYear")) {
-          // if ( parsed.contains( "inceptionYear" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "inceptionYear" );
-          // model.setInceptionYear( getTrimmedValue( parser.nextText()) );
-        } else if (parser.getName().equals("mailingLists")) {
-          // if ( parsed.contains( "mailingLists" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "mailingLists" );
-          // java.util.List mailingLists = new java.util.ArrayList();
-          // model.setMailingLists( mailingLists );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("mailingList")) {
-              // mailingLists.add( parseMailingList( "mailingList", parser,
-              // strict, encoding ) );
-            } else {
-              parser.nextText();
+          previousTag = tagName;
+          previousTagLineNumber = parser.getLineNumber();
+          if (parser.getLineNumber() != 1) {
+            structureConventionsViolation = new StructureConventionsViolation();
+            structureConventionsViolation.setLineNumber(parser.getLineNumber());
+            structureConventionsViolation.setTagName(parser.getName());
+            structureConventionsViolation.setMessage("The tag '" + parser.getName() + "' should be on first line");
+            listStructureConventionsViolations.add(structureConventionsViolation);
+          }
+
+        } else if (parser.getDepth() == 2) {
+          int positionPrevious = mavenConventions.getPosition(previousTag);
+          int positionTag = mavenConventions.getPosition(parser.getName());
+          if (positionTag != -1 && positionPrevious != -1) {
+            if (positionTag < positionPrevious) {
+              String message = Util.buildOrderViolationMessage(parser.getLineNumber(), parser.getName(), previousTag);
+              structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
+              listStructureConventionsViolations.add(structureConventionsViolation);
             }
           }
-        } else if (parser.getName().equals("developers")) {
-          // if ( parsed.contains( "developers" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "developers" );
-          // java.util.List developers = new java.util.ArrayList();
-          // model.setDevelopers( developers );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("developer")) {
-              // developers.add( parseDeveloper( "developer", parser, strict,
-              // encoding ) );
-            } else {
-              parser.nextText();
+          int spaceIndentWanted = mavenConventions.getSpaceIndent(parser.getName());
+          if (spaceIndentWanted != -1) {
+            int columnNumber = parser.getColumnNumber();
+
+            int spaceIndentReal = columnNumber - parser.getName().length() - 2;
+            if (spaceIndentReal != spaceIndentWanted) {
+              String message = Util.buildTabSpacedViolationMessage(parser.getLineNumber(), parser.getName(), spaceIndentReal,
+                  spaceIndentWanted);
+              structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
+              listStructureConventionsViolations.add(structureConventionsViolation);
             }
           }
-        } else if (parser.getName().equals("contributors")) {
-          // if ( parsed.contains( "contributors" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "contributors" );
-          // java.util.List contributors = new java.util.ArrayList();
-          // model.setContributors( contributors );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("contributor")) {
-              // contributors.add( parseContributor( "contributor", parser,
-              // strict, encoding ) );
+          int skipLineWanted = -1;
+          if (mavenConventions.sameGroup(parser.getName(), previousTag)) {
+            skipLineWanted = mavenConventions.getSkipLine(previousTag);
+          } else {
+            skipLineWanted = mavenConventions.getGroup(previousTag).getSkipLine();
+          }
+          if (skipLineWanted != -1) {
+            int skipLineReal = parser.getLineNumber() - 1;
+            if (linePreviousTagEnd != -1) {
+              skipLineReal -= linePreviousTagEnd;
             } else {
-              parser.nextText();
+              // we are after tag 'project' and in this case we check lines skipped with START_TAG
+              skipLineReal -= previousTagLineNumber;
+            }
+            if (skipLineReal != skipLineWanted) {
+              String message = Util.buildSkipLineViolationMessage(parser.getLineNumber(), previousTag, skipLineReal, skipLineWanted);
+              structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
+              listStructureConventionsViolations.add(structureConventionsViolation);
             }
           }
-        } else if (parser.getName().equals("licenses")) {
-          // if ( parsed.contains( "licenses" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "licenses" );
-          // java.util.List licenses = new java.util.ArrayList();
-          // model.setLicenses( licenses );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("license")) {
-              // licenses.add( parseLicense( "license", parser, strict, encoding
-              // ) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("scm")) {
-          // if ( parsed.contains( "scm" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "scm" );
-          // model.setScm( parseScm( "scm", parser, strict, encoding ) );
-        } else if (parser.getName().equals("organization") || parser.getName().equals("organisation")) {
-          // if ( parsed.contains( "organization" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "organization" );
-          // model.setOrganization( parseOrganization( "organization", parser,
-          // strict, encoding ) );
-        } else if (parser.getName().equals("build")) {
-          if (parsed.contains("build")) {
-            throw new XmlPullParserException("Duplicated tag: '" + parser.getName() + "'", parser, null);
-          }
-          parsed.add("build");
-          // model.setBuild( parseBuild( "build", parser, strict, encoding ) );
-        } else if (parser.getName().equals("profiles")) {
-          // if ( parsed.contains( "profiles" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "profiles" );
-          // java.util.List profiles = new java.util.ArrayList();
-          // model.setProfiles( profiles );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("profile")) {
-              // profiles.add( parseProfile( "profile", parser, strict, encoding
-              // ) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("modules")) {
-          // if ( parsed.contains( "modules" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "modules" );
-          // java.util.List modules = new java.util.ArrayList();
-          // model.setModules( modules );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("module")) {
-              // modules.add( getTrimmedValue( parser.nextText()) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("repositories")) {
-          // if ( parsed.contains( "repositories" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "repositories" );
-          // java.util.List repositories = new java.util.ArrayList();
-          // model.setRepositories( repositories );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("repository")) {
-              // repositories.add( parseRepository( "repository", parser,
-              // strict, encoding ) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("pluginRepositories")) {
-          // if ( parsed.contains( "pluginRepositories" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "pluginRepositories" );
-          // java.util.List pluginRepositories = new java.util.ArrayList();
-          // model.setPluginRepositories( pluginRepositories );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("pluginRepository")) {
-              // pluginRepositories.add( parseRepository( "pluginRepository",
-              // parser, strict, encoding ) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("dependencies")) {
-          // if ( parsed.contains( "dependencies" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "dependencies" );
-          // java.util.List dependencies = new java.util.ArrayList();
-          // model.setDependencies( dependencies );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            if (parser.getName().equals("dependency")) {
-              // dependencies.add( parseDependency( "dependency", parser,
-              // strict, encoding ) );
-            } else {
-              parser.nextText();
-            }
-          }
-        } else if (parser.getName().equals("reports")) {
-          // if ( parsed.contains( "reports" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "reports" );
-          // model.setReports( Xpp3DomBuilder.build( parser ) );
-        } else if (parser.getName().equals("reporting")) {
-          if (parsed.contains("reporting")) {
-            throw new XmlPullParserException("Duplicated tag: '" + parser.getName() + "'", parser, null);
-          }
-          parsed.add("reporting");
-          // model.setReporting( parseReporting( "reporting", parser, strict,
-          // encoding ) );
-        } else if (parser.getName().equals("dependencyManagement")) {
-          // if ( parsed.contains( "dependencyManagement" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "dependencyManagement" );
-          // model.setDependencyManagement( parseDependencyManagement(
-          // "dependencyManagement", parser, strict, encoding ) );
-        } else if (parser.getName().equals("distributionManagement")) {
-          // if ( parsed.contains( "distributionManagement" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "distributionManagement" );
-          // model.setDistributionManagement( parseDistributionManagement(
-          // "distributionManagement", parser, strict, encoding ) );
-        } else if (parser.getName().equals("properties")) {
-          // if ( parsed.contains( "properties" ) )
-          // {
-          // throw new XmlPullParserException( "Duplicated tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // parsed.add( "properties" );
-          while (parser.nextTag() == XmlPullParser.START_TAG) {
-            String key = parser.getName();
-            String value = parser.nextText().trim();
-            // model.addProperty( key, value );
-          }
-        } else {
-          // if ( foundRoot )
-          // {
-          // if ( strict )
-          // {
-          // throw new XmlPullParserException( "Unrecognised tag: '" +
-          // parser.getName() + "'", parser, null);
-          // }
-          // }
+
+          previousTagLineNumber = parser.getLineNumber();
+          previousTag = parser.getName();
+        }
+      } else if (eventType == XmlPullParser.END_TAG) {
+        if (parser.getDepth() <= 2) {
+          linePreviousTagEnd = parser.getLineNumber();
         }
       }
       eventType = parser.next();
     }
-    return model;
-  } // -- Model parseModel(String, XmlPullParser, boolean, String)
+    return listStructureConventionsViolations;
+  } // -- List<StructureConventionsViolation> parseModel(String, XmlPullParser, boolean, String, boolean, boolean, MavenConventions)
 
   /**
    * Method parseModelBase
@@ -3098,12 +2825,13 @@ public class PomFileReader {
    * @param reader
    * @param strict
    */
-  public Model read(Reader reader, boolean strict) throws IOException, XmlPullParserException {
+  public List<StructureConventionsViolation> read(Reader reader, boolean strict, boolean checkSkipLine, boolean checkTabSpaced,
+      MavenConventions mavenConventions) throws IOException, XmlPullParserException {
     XmlPullParser parser = initParser(reader);
     String encoding = parser.getInputEncoding();
 
-    return parseModel("project", parser, strict, encoding);
-  } // -- Model read(Reader, boolean)
+    return parseModel("project", parser, strict, encoding, checkSkipLine, checkTabSpaced, mavenConventions);
+  } // -- List<StructureConventionsViolation> read(Reader, boolean)
 
   private XmlPullParser initParser(Reader reader) throws XmlPullParserException, IOException {
     XmlPullParser parser = new MXParser();
@@ -3385,23 +3113,24 @@ public class PomFileReader {
    * lines) are OK.
    * 
    * @param reader
+   * @param checkSkipLine
+   * @param mavenConventions
    */
-  public Model read(Reader reader) throws IOException, XmlPullParserException {
-    return read(reader, true);
-  } // -- Model read(Reader)
+  public List<StructureConventionsViolation> read(Reader reader, boolean checkSkipLine, boolean checkTabSpaced,
+      MavenConventions mavenConventions) throws IOException, XmlPullParserException {
+    return read(reader, true, checkSkipLine, checkTabSpaced, mavenConventions);
+  } // -- List<StructureConventionsViolation> read(Reader)
 
   /**
-   * Initialize tag list with all tags in good order.
-   */
-  public void initTagList() {
-
-  }
-
-  /**
-   * Build a list which contains dependency object and line number where this dependency is declared in pom file. 
-   * @param reader Reader.
-   * @return List which contains dependency object and line number where this dependency is declared in pom file.
-   * @throws XmlPullParserException Exception if problem occured during parsing.
+   * Build a list which contains dependency object and line number where this
+   * dependency is declared in pom file.
+   * 
+   * @param reader
+   *          Reader.
+   * @return List which contains dependency object and line number where this
+   *         dependency is declared in pom file.
+   * @throws XmlPullParserException
+   *           Exception if problem occured during parsing.
    * @throws IOException
    */
   public List<DependencyLocation> buildDependencyLineStructure(Reader reader) throws XmlPullParserException, IOException {
@@ -3411,12 +3140,19 @@ public class PomFileReader {
   }
 
   /**
-   * Build a list which contains dependency object and line number where this dependency is declared in pom file. 
-   * @param tagName Root tag.
-   * @param parser Parser used.
-   * @param encoding File encoding.
-   * @return List which contains dependency object and line number where this dependency is declared in pom file.
-   * @throws XmlPullParserException Exception if problem occured during parsing.
+   * Build a list which contains dependency object and line number where this
+   * dependency is declared in pom file.
+   * 
+   * @param tagName
+   *          Root tag.
+   * @param parser
+   *          Parser used.
+   * @param encoding
+   *          File encoding.
+   * @return List which contains dependency object and line number where this
+   *         dependency is declared in pom file.
+   * @throws XmlPullParserException
+   *           Exception if problem occured during parsing.
    * @throws IOException
    */
   private List<DependencyLocation> buildDependencyLineStructure(String tagName, XmlPullParser parser, String encoding) throws IOException,
@@ -3484,12 +3220,13 @@ public class PomFileReader {
             inDependencies = false;
             inRoot = true;
           }
-        } 
-        
+        }
+
       }
       eventType = parser.next();
     }
     return dependencyLine;
-  } // -- List<DependencyLocation> buildDependencyLineStructure(String, XmlPullParser, String)
+  } // -- List<DependencyLocation> buildDependencyLineStructure(String,
+    // XmlPullParser, String)
 
 }

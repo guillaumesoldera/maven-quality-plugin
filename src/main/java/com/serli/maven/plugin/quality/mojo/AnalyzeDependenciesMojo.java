@@ -1,4 +1,4 @@
-package com.serli.maven.plugin.quality;
+package com.serli.maven.plugin.quality.mojo;
 
 /*
  * Copyright 2001-2005 The Apache Software Foundation.
@@ -187,7 +187,6 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
     reader = new FileReader(pom);
     List<DependencyLocation> buildDependencyLineStructure = pomFileReader.buildDependencyLineStructure(reader);
-    getLog().info("taille de la structure : " + buildDependencyLineStructure.size());
     return buildDependencyLineStructure;
   }
 
@@ -265,7 +264,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     if (outputXML) {
       StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
           checkUniqueDeclaration);
-      writeFile(dependenciesResult.toString());
+      Util.writeFile(dependenciesResult.toString(), outputFile, getLog());
     } else {
       if (!usedDeclared.isEmpty()) {
         getLog().info("Used declared dependencies found:");
@@ -377,7 +376,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
   private void logArtifacts(Set<Artifact> artifacts, boolean warn) throws IOException {
     if (artifacts.isEmpty()) {
-      writeFile("   None");
+      Util.writeFile("   None", outputFile, getLog());
     } else {
       for (Iterator<Artifact> iterator = artifacts.iterator(); iterator.hasNext();) {
         Artifact artifact = iterator.next();
@@ -386,7 +385,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
         // do this. MNG-2961
         artifact.isSnapshot();
 
-        writeFile("   " + artifact);
+        Util.writeFile("   " + artifact, outputFile, getLog());
 
       }
     }
@@ -689,23 +688,6 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     return writer;
   }
 
-  /**
-   * Write a string in outputFile. If outputFile is null, write in log.
-   * 
-   * @param pString
-   *          String to write.
-   * @throws IOException
-   */
-  private void writeFile(String pString) throws IOException {
-    if (outputFile != null) {
-      FileWriter fw = new FileWriter(outputFile, true);
-      BufferedWriter output = new BufferedWriter(fw);
-      output.write(pString);
-      output.flush();
-      output.close();
-    } else {
-      getLog().warn(pString);
-    }
-  }
+ 
 
 }
