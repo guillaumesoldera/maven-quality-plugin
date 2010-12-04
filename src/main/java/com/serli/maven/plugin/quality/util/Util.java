@@ -13,8 +13,10 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
+import org.apache.commons.validator.UrlValidator;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.logging.Log;
+import org.codehaus.plexus.util.StringUtils;
 
 import com.serli.maven.plugin.quality.model.DependencyLocation;
 import com.serli.maven.plugin.quality.model.jaxb.FormattingConventions;
@@ -24,6 +26,8 @@ import com.serli.maven.plugin.quality.model.jaxb.Tag;
 
 public final class Util {
 
+  private static final UrlValidator URL_VALIDATOR = new UrlValidator(new String[] { "http", "https" });
+  
   private Util() {
 
   }
@@ -117,5 +121,19 @@ public final class Util {
     } else {
       log.warn(pString);
     }
+  }
+  
+  /**
+   * @param url
+   *          not null
+   * @return <code>true</code> if the url is valid, <code>false</code>
+   *         otherwise.
+   */
+  public static boolean isArtifactUrlValid(String url) {
+    if (StringUtils.isEmpty(url)) {
+      return false;
+    }
+
+    return URL_VALIDATOR.isValid(url);
   }
 }

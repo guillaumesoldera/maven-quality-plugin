@@ -25,7 +25,6 @@ import org.apache.maven.artifact.resolver.filter.ScopeArtifactFilter;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.shared.dependency.tree.DependencyNode;
@@ -34,6 +33,8 @@ import org.apache.maven.shared.dependency.tree.DependencyTreeBuilderException;
 import org.codehaus.plexus.util.StringUtils;
 
 import com.serli.maven.plugin.quality.model.License;
+import com.serli.maven.plugin.quality.model.MavenProject;
+import com.serli.maven.plugin.quality.util.Util;
 
 /**
  * Goal which checks licenses and headers.
@@ -51,7 +52,7 @@ public class LicenseMojo extends AbstractMojo {
    * @required
    * @readonly
    */
-  private MavenProject project;
+  private org.apache.maven.project.MavenProject project;
 
   /**
    * Dependency tree builder component.
@@ -127,12 +128,12 @@ public class LicenseMojo extends AbstractMojo {
     }
   };
 
-  private static final UrlValidator URL_VALIDATOR = new UrlValidator(new String[] { "http", "https" });
+  
 
   /** Random used to generate a UID */
   private static SecureRandom RANDOM;
 
-  private List allDependencies;
+  private List allDependencies = new ArrayList();
 
   public void execute() throws MojoExecutionException, MojoFailureException {
     try {
@@ -140,6 +141,7 @@ public class LicenseMojo extends AbstractMojo {
     } catch (Exception e) {
       e.printStackTrace();
     }
+    
     // TODO s'inspirer de
     // http://maven-license-plugin.googlecode.com/svn/branches/maven-license-plugin-1.x.x/src/main/java/com/google/code/mojo/license/LicenseCheckMojo.java
     // TODO extends de AbstractLicenseMojo, mais ecrire dans un fichier les
@@ -172,36 +174,16 @@ public class LicenseMojo extends AbstractMojo {
     }
     DependencyNode dependencyTreeNode = resolveProject();
     getAllDependencies(dependencyTreeNode);
+//    System.out.println("-------------dependencies--------------------");
+//    for (int i = 0; i<allDependencies.size(); i++) {
+//      Artifact a = (Artifact) allDependencies.get(i);
+//      System.out.println(a.getId());
+//    }
+    
     printDependencyListing(dependencyTreeNode);
 
-//    Iterator iterator = licenseMap.keySet().iterator();
-//    while (iterator.hasNext()) {
-//      System.out.println("-------------------------------------------------");
-//      String licenseName = (String) iterator.next();
-//      System.out.println("licence : " + licenseName);
-//      SortedSet projects = (SortedSet) licenseMap.get(licenseName);
-//      StringBuffer buffer = new StringBuffer();
-//      Iterator iteratorProjets = projects.iterator();
-//      while (iteratorProjets.hasNext()) {
-//        String projectName = (String) iteratorProjets.next();
-//        buffer.append(projectName);
-//        if (iteratorProjets.hasNext()) {
-//          buffer.append(",");
-//        }
-//      }
-//    }
-    printGroupedLicenses();
-
-    // Dependencies dependencies = new Dependencies( project,
-    // dependencyTreeNode, classesAnalyzer );
-
-    // Artifact artifact = node.getArtifact();
-    // MavenProject artifactProject = repoUtils.getMavenProjectFromRepository(
-    // artifact );
-    // String artifactDescription = artifactProject.getDescription();
-    // String artifactUrl = artifactProject.getUrl();
-    // String artifactName = artifactProject.getName();
-    // List licenses2 = artifactProject.getLicenses();
+//    printGroupedLicenses();
+    printLicenses();
 
   }
 
@@ -214,7 +196,7 @@ public class LicenseMojo extends AbstractMojo {
    * @throws IOException
    *           if any
    */
-  protected static URL getLicenseURL(MavenProject project, String url) throws IOException {
+  protected static URL getLicenseURL(org.apache.maven.project.MavenProject project, String url) throws IOException {
     URL licenseUrl = null;
     UrlValidator urlValidator = new UrlValidator(UrlValidator.ALLOW_ALL_SCHEMES);
     // UrlValidator does not accept file URLs because the file
@@ -298,16 +280,14 @@ public class LicenseMojo extends AbstractMojo {
   private void printDescriptionsAndURLs(DependencyNode node, String uid) {
     Artifact artifact = node.getArtifact();
     String id = artifact.getId();
-    System.out.println("id = " + id);
+//    System.out.println("id = " + id);
     
-    String unknownLicenseMessage = "licenses inconnues";
 
     if (!Artifact.SCOPE_SYSTEM.equals(artifact.getScope())) {
       try {
-        MavenProject artifactProject = getMavenProjectFromRepository(artifact);
+        MavenProject artifactProject = new MavenProject(getMavenProjectFromRepository(artifact));
         String artifactDescription = artifactProject.getDescription();
         String artifactUrl = artifactProject.getUrl();
-        String artifactName = artifactProject.getName();
         List licenses = artifactProject.getLicenses();
         
         
@@ -316,45 +296,33 @@ public class LicenseMojo extends AbstractMojo {
         }
 
         if (StringUtils.isNotEmpty(artifactUrl)) {
-          if (isArtifactUrlValid(artifactUrl)) {
+          if (Util.isArtifactUrlValid(artifactUrl)) {
 //            System.out.println("artifactURL : " + artifactUrl);
           } else {
 //            System.out.println("artifactURL : " + artifactUrl);
           }
         }
 
-//        System.out.println("licenses title " + ": ");
         if (!licenses.isEmpty()) {
           for (Iterator iter = licenses.iterator(); iter.hasNext();) {
-            License element = (License) iter.next();
+            org.apache.maven.model.License element = (org.apache.maven.model.License) iter.next();
             String licenseName = element.getName();
             String licenseUrl = element.getUrl();
             License license = new License();
+            if (StringUtils.isEmpty(licenseName)) {
+              licenseName = "Unnamed";
+            }
             license.setName(licenseName);
             license.setUrl(licenseUrl);
-            if (licenseUrl != null) {
-              System.out.println("licenseUrl : " + licenseUrl);
-            }
-//            System.out.println("licenseName ; " + licenseName);
+//            System.out.println(artifactProject.getId() + " - ");
+//            System.out.println("licenseName : " + licenseName + "   - licenseUrl : " + licenseUrl);
             put(license, artifactProject);
-//            licenseMap.put(licenseName, artifactName);
           }
         } else {
-//          System.out.println("license nolicense");
           setArtifactNoLicense.add(artifactProject);
-//          licenseMap.put(unknownLicenseMessage, artifactName);
         }
       } catch (ProjectBuildingException e) {
         getLog().error("ProjectBuildingException error : ", e);
-      }
-    } else {
-//      System.out.println("id : " + id);
-//      System.out.println("column.description : ");
-//      System.out.println("index nodescription");
-
-      if (artifact.getFile() != null) {
-//        System.out.println("column.url " + ": ");
-//        System.out.println(artifact.getFile().getAbsolutePath());
       }
     }
 
@@ -362,13 +330,33 @@ public class LicenseMojo extends AbstractMojo {
 
   private void printLicenses() {
     // TODO afficher au format XML et dans un fichier ou non
+    Set<License> keys = resultLicenseMap.keySet();
+    for (License license : keys) {
+      String url = license.getUrl();
+      String name = license.getName();
+      if (StringUtils.isEmpty(name)) {
+        name = "Unnamed";
+      }
+      System.out.println("Licence " + name + " - " + url);
+      SortedSet<MavenProject> sortedSet = resultLicenseMap.get(license);
+      for (MavenProject artifact : sortedSet) {
+        System.out.println("\t " + artifact.getId());
+      }
+      
+    }
+    
+    System.out.println("Inconnu : ");
+    for (MavenProject project : setArtifactNoLicense) {
+      System.out.println("\t " + project.getId());
+    }
+    
   }
   
   private void printGroupedLicenses() {
     for (Iterator iter = licenseMap.keySet().iterator(); iter.hasNext();) {
       String licenseName = (String) iter.next();
       if (StringUtils.isEmpty(licenseName)) {
-        System.out.println("unamed");
+        System.out.println("unnamed");
       } else {
         System.out.println(licenseName + " : ");
       }
@@ -407,7 +395,7 @@ public class LicenseMojo extends AbstractMojo {
    * @throws ProjectBuildingException
    *           if any
    */
-  public MavenProject getMavenProjectFromRepository(Artifact artifact) throws ProjectBuildingException {
+  public org.apache.maven.project.MavenProject getMavenProjectFromRepository(Artifact artifact) throws ProjectBuildingException {
     Artifact projectArtifact = artifact;
 
     boolean allowStubModel = false;
@@ -426,14 +414,13 @@ public class LicenseMojo extends AbstractMojo {
    *         tree.
    */
   public List getAllDependencies(DependencyNode dependencyTreeNode) {
-    if (allDependencies != null) {
-      return allDependencies;
-    }
+//    if (allDependencies != null) {
+//      return allDependencies;
+//    }
 
-    allDependencies = new ArrayList();
     for (Iterator i = dependencyTreeNode.getChildren().iterator(); i.hasNext();) {
       DependencyNode dependencyNode = (DependencyNode) i.next();
-
+//      System.out.println("\t " + dependencyNode.getArtifact().getId());
       if (dependencyNode.getState() != DependencyNode.INCLUDED) {
         continue;
       }
@@ -453,23 +440,28 @@ public class LicenseMojo extends AbstractMojo {
     return allDependencies;
   }
 
-  /**
-   * @param url
-   *          not null
-   * @return <code>true</code> if the url is valid, <code>false</code>
-   *         otherwise.
-   */
-  public static boolean isArtifactUrlValid(String url) {
-    if (StringUtils.isEmpty(url)) {
-      return false;
-    }
-
-    return URL_VALIDATOR.isValid(url);
-  }
+  
   
   private void put(License key, MavenProject projectArtifact) {
     // handle multiple values as a set to avoid duplicates
-    SortedSet<MavenProject> valueList = resultLicenseMap.get(key);
+    SortedSet<MavenProject> valueList = null;
+    Set<License> keySet = resultLicenseMap.keySet();
+    String url = key.getUrl();
+    for (License license : keySet) {
+      String urlLicense = license.getUrl();
+      String nameLicense = license.getName();
+      if (license.equals(key)) {
+        valueList = resultLicenseMap.remove(license);
+        if (Util.isArtifactUrlValid(urlLicense)) {
+          key.setUrl(urlLicense);
+        }
+        if (StringUtils.isNotEmpty(nameLicense)) {
+          key.setName(nameLicense);
+        }
+        break;
+      }
+    }
+    
     if (valueList == null) {
       valueList = new TreeSet<MavenProject>();
     }
