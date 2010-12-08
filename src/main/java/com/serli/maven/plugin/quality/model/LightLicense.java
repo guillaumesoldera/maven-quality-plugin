@@ -1,25 +1,28 @@
 package com.serli.maven.plugin.quality.model;
 
+import org.apache.maven.model.License;
 import org.codehaus.plexus.util.StringUtils;
 
 import com.serli.maven.plugin.quality.util.Util;
 
-public class License extends org.apache.maven.model.License {
+public class LightLicense extends License {
 
   /**
    * 
    */
   private static final long serialVersionUID = 1L;
 
-  public License() {
+  
+  public LightLicense() {
     super();
   }
+
 
   @Override
   public boolean equals(Object obj) {
     boolean isEquals = false;
-    License oLicence = (License) obj;
-    if (oLicence != null && oLicence instanceof License) {
+    LightLicense oLicence = (LightLicense) obj;
+    if (oLicence != null && oLicence instanceof LightLicense) {
       if (getUrl() != null) {
         if (oLicence.getUrl() != null) {
           if (Util.isArtifactUrlValid(getUrl()) && Util.isArtifactUrlValid(oLicence.getUrl())) {

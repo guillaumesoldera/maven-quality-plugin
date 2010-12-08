@@ -11,7 +11,7 @@
 	<url>http://maven.apache.org</url>
 	<description>Analyze pom quality (used and unused dependencies, Maven conventions check) and report</description>
 	<inceptionYear>2010</inceptionYear>
-	
+
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.version>2.0.9</maven.version>
@@ -27,7 +27,13 @@
 		</developer>
 	</developers>
 
-
+	<licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
 
 	<dependencies>
 
@@ -72,6 +78,13 @@
 			<artifactId>commons-validator</artifactId>
 			<version>1.2.0</version>
 		</dependency>
+
+		<dependency>
+			<groupId>com.mycila.maven-license-plugin</groupId>
+			<artifactId>maven-license-plugin</artifactId>
+			<version>1.8.0</version>
+		</dependency>
+
 
 		<dependency>
 			<groupId>junit</groupId>

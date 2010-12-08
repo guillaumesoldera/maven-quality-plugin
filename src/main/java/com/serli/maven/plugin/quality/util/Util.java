@@ -119,7 +119,7 @@ public final class Util {
       output.flush();
       output.close();
     } else {
-      log.warn(pString);
+      log.info(pString);
     }
   }
   
