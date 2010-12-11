@@ -57,17 +57,16 @@ public class LicenseMojo extends AbstractLicenseMojo {
   /**
    * Whether to fail the build if some file miss license header
    * 
-   * @parameter expression="${license.failIfMissing}" default-value="true"
+   * @parameter expression="${license.failIfMissing}" default-value="false"
    */
-  protected boolean failIfMissing = true;
-  
+  protected boolean failIfMissing;
+
   /**
    * Output file.
    * 
    * @parameter expression="${outputFile}"
    */
   private File outputFile;
-
 
   /**
    * The Maven project to analyze.
@@ -186,35 +185,35 @@ public class LicenseMojo extends AbstractLicenseMojo {
       LightLicense projectLicense = new LightLicense();
       projectLicense.setName(license.getName());
       projectLicense.setUrl(license.getUrl());
-
+      header = projectLicense.getUrl();
       projectLicenses.add(projectLicense);
-      // TODO utile pour vérifier les headers
-      URL licenseUrl = null;
-      try {
-        licenseUrl = getLicenseURL(project, license.getUrl());
-        System.out.println("licenseURL = " + licenseUrl);
-      } catch (MalformedURLException e) {
-        getLog().error(e.getMessage());
-      } catch (IOException e) {
-        getLog().error(e.getMessage());
-      }
 
-      if (licenseUrl != null && licenseUrl.getProtocol().equals("file")) {
-      }
+      // TODO que faire si plusieurs licenses pour le projet
+
+      // URL licenseUrl = null;
+      // try {
+      // licenseUrl = getLicenseURL(project, license.getUrl());
+      // System.out.println("licenseURL = " + licenseUrl);
+      // } catch (MalformedURLException e) {
+      // getLog().error(e.getMessage());
+      // } catch (IOException e) {
+      // getLog().error(e.getMessage());
+      // }
+      //
+      // if (licenseUrl != null && licenseUrl.getProtocol().equals("file")) {
+      // }
 
     }
+
+    checkHeaders();
+
     DependencyNode dependencyTreeNode = resolveProject();
     getAllDependencies(dependencyTreeNode);
-    // System.out.println("-------------dependencies--------------------");
-    // for (int i = 0; i<allDependencies.size(); i++) {
-    // Artifact a = (Artifact) allDependencies.get(i);
-    // System.out.println(a.getId());
-    // }
 
     stockAllArtifactAndItsLicense(dependencyTreeNode);
-
+    // TODO enlever le projet des autres listes et maps
     // printGroupedLicenses();
-//    printLicenses();
+    // printLicenses();
     StringBuffer buffer = printResults();
     try {
       Util.writeFile(buffer.toString(), outputFile, getLog());
@@ -229,17 +228,29 @@ public class LicenseMojo extends AbstractLicenseMojo {
     PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter(out);
     writer.startElement("licenses");
     writer = printProjectLicense(writer);
+    writer = printMissingHeader(writer);
     writer = printDependenciesLicense(writer);
     writer.endElement();
     return out.getBuffer();
   }
-  
+
+  private PrettyPrintXMLWriter printMissingHeader(PrettyPrintXMLWriter writer) {
+    writer.startElement("missingHeaders");
+    for (File file : missingHeaders) {
+      writer.startElement("file");
+      writer.writeText(file.getName());
+      writer.endElement();
+    }
+    writer.endElement();
+    return writer;
+  }
+
   private PrettyPrintXMLWriter printDependenciesLicense(PrettyPrintXMLWriter writer) {
     writer.startElement("dependenciesLicense");
     if (resultLicenseMap != null && resultLicenseMap.size() > 0) {
-    Set<LightLicense> keys = resultLicenseMap.keySet();
-    for (LightLicense license : keys) {
-      writer.startElement("license");
+      Set<LightLicense> keys = resultLicenseMap.keySet();
+      for (LightLicense license : keys) {
+        writer.startElement("license");
         String url = license.getUrl();
         String name = license.getName();
         if (StringUtils.isEmpty(name)) {
@@ -249,27 +260,27 @@ public class LicenseMojo extends AbstractLicenseMojo {
           url = "unavailable";
         }
         writer.startElement("name");
-          writer.writeText(name);
+        writer.writeText(name);
         writer.endElement();
         writer.startElement("url");
-          writer.writeText(url);
+        writer.writeText(url);
         writer.endElement();
         SortedSet<MavenProjectComparable> sortedSet = resultLicenseMap.get(license);
         for (MavenProject artifact : sortedSet) {
           writer.startElement("dependency");
-            String id = artifact.getModel().getName();
-            if (StringUtils.isEmpty(id)) {
-              id = artifact.getArtifactId();
-            }
-            writer.startElement("name");
-            writer.writeText(id);
-            writer.endElement();
+          String id = artifact.getModel().getName();
+          if (StringUtils.isEmpty(id)) {
+            id = artifact.getArtifactId();
+          }
+          writer.startElement("name");
+          writer.writeText(id);
+          writer.endElement();
           writer.endElement();
         }
-      writer.endElement();
+        writer.endElement();
+      }
     }
-    }
-    
+
     writer.startElement("unknownLicense");
     for (MavenProject project : setArtifactNoLicense) {
       writer.startElement("dependency");
@@ -289,25 +300,25 @@ public class LicenseMojo extends AbstractLicenseMojo {
 
   private PrettyPrintXMLWriter printProjectLicense(PrettyPrintXMLWriter writer) {
     writer.startElement("projectLicense");
-    if (projectLicenses != null && projectLicenses.size()>0) {
-      for (LightLicense license : projectLicenses) {
-      writer.startElement("license");
-      writer.startElement("name");
-      String name = license.getName();
-      if (StringUtils.isEmpty(name)) {
-        name = "Unnamed";
+      if (projectLicenses != null && projectLicenses.size() > 0) {
+        for (LightLicense license : projectLicenses) {
+          writer.startElement("license");
+            writer.startElement("name");
+            String name = license.getName();
+            if (StringUtils.isEmpty(name)) {
+              name = "Unnamed";
+            }
+            writer.writeText(name);
+            writer.endElement();
+            String url = license.getUrl();
+            if (StringUtils.isNotEmpty(url)) {
+              writer.startElement("url");
+              writer.writeText(url);
+              writer.endElement();
+            }
+          writer.endElement();
+        }
       }
-      writer.writeText(name);
-      String url = license.getUrl();
-      if (StringUtils.isNotEmpty(url)) {
-        writer.writeText("url");
-        writer.writeText(url);
-        writer.endElement();
-      }
-      writer.endElement();
-      writer.endElement();
-      }
-    }
     writer.endElement();
     return writer;
   }
@@ -374,7 +385,6 @@ public class LicenseMojo extends AbstractLicenseMojo {
     String dependencyDetailId = getUUID();
     String imgId = getUUID();
 
-    
     stockArtifactAndItsLicense(node, dependencyDetailId);
 
     if (!node.getChildren().isEmpty()) {
@@ -402,58 +412,58 @@ public class LicenseMojo extends AbstractLicenseMojo {
 
   }
 
-
   private void stockArtifactAndItsLicense(DependencyNode node, String uid) {
     Artifact artifact = node.getArtifact();
     String id = artifact.getId();
-//    System.out.println("id = " + id);
-    
+    // System.out.println("id = " + id);
+    if (!id.equals(project.getId())) {
 
-    if (!Artifact.SCOPE_SYSTEM.equals(artifact.getScope())) {
-      try {
-        MavenProjectComparable artifactProject = new MavenProjectComparable(getMavenProjectFromRepository(artifact));
-        String artifactDescription = artifactProject.getDescription();
-        String artifactUrl = artifactProject.getUrl();
-        List licenses = artifactProject.getLicenses();
-        
-        
-        if (StringUtils.isNotEmpty(artifactDescription)) {
-//          System.out.println("artifactDescription : " + artifactDescription);
-        }
+      if (!Artifact.SCOPE_SYSTEM.equals(artifact.getScope())) {
+        try {
+          MavenProjectComparable artifactProject = new MavenProjectComparable(getMavenProjectFromRepository(artifact));
+          String artifactDescription = artifactProject.getDescription();
+          String artifactUrl = artifactProject.getUrl();
+          List licenses = artifactProject.getLicenses();
 
-        if (StringUtils.isNotEmpty(artifactUrl)) {
-          if (Util.isArtifactUrlValid(artifactUrl)) {
-//            System.out.println("artifactURL : " + artifactUrl);
-          } else {
-//            System.out.println("artifactURL : " + artifactUrl);
+          if (StringUtils.isNotEmpty(artifactDescription)) {
+            // System.out.println("artifactDescription : " +
+            // artifactDescription);
           }
-        }
 
-        if (!licenses.isEmpty()) {
-          for (Iterator iter = licenses.iterator(); iter.hasNext();) {
-            License element = (License) iter.next();
-            String licenseName = element.getName();
-            String licenseUrl = element.getUrl();
-            LightLicense license = new LightLicense();
-            if (StringUtils.isEmpty(licenseName)) {
-              licenseName = "Unnamed";
+          if (StringUtils.isNotEmpty(artifactUrl)) {
+            if (Util.isArtifactUrlValid(artifactUrl)) {
+              // System.out.println("artifactURL : " + artifactUrl);
+            } else {
+              // System.out.println("artifactURL : " + artifactUrl);
             }
-            license.setName(licenseName);
-            license.setUrl(licenseUrl);
-//            System.out.println(artifactProject.getId() + " - ");
-//            System.out.println("licenseName : " + licenseName + "   - licenseUrl : " + licenseUrl);
-            put(license, artifactProject);
           }
-        } else {
-          setArtifactNoLicense.add(artifactProject);
+
+          if (!licenses.isEmpty()) {
+            for (Iterator iter = licenses.iterator(); iter.hasNext();) {
+              License element = (License) iter.next();
+              String licenseName = element.getName();
+              String licenseUrl = element.getUrl();
+              LightLicense license = new LightLicense();
+              if (StringUtils.isEmpty(licenseName)) {
+                licenseName = "Unnamed";
+              }
+              license.setName(licenseName);
+              license.setUrl(licenseUrl);
+              // System.out.println(artifactProject.getId() + " - ");
+              // System.out.println("licenseName : " + licenseName +
+              // "   - licenseUrl : " + licenseUrl);
+              put(license, artifactProject);
+            }
+          } else {
+            setArtifactNoLicense.add(artifactProject);
+          }
+        } catch (ProjectBuildingException e) {
+          getLog().error("ProjectBuildingException error : ", e);
         }
-      } catch (ProjectBuildingException e) {
-        getLog().error("ProjectBuildingException error : ", e);
       }
     }
 
   }
-
 
   private void printLicenses() {
     // TODO afficher au format XML et dans un fichier ou non
@@ -469,41 +479,39 @@ public class LicenseMojo extends AbstractLicenseMojo {
       for (MavenProject artifact : sortedSet) {
         System.out.println("\t " + artifact.getId());
       }
-      
+
     }
-    
+
     System.out.println("Inconnu : ");
     for (MavenProject project : setArtifactNoLicense) {
       System.out.println("\t " + project.getId());
     }
-    
+
   }
 
-
-      private void printGroupedLicenses() {
-        for (Iterator iter = licenseMap.keySet().iterator(); iter.hasNext();) {
-          String licenseName = (String) iter.next();
-          if (StringUtils.isEmpty(licenseName)) {
-            System.out.println("unnamed");
-          } else {
-            System.out.println(licenseName + " : ");
-          }
-
-          SortedSet projects = (SortedSet) licenseMap.get(licenseName);
-
-          StringBuffer buffer = new StringBuffer();
-          for (Iterator iterator = projects.iterator(); iterator.hasNext();) {
-            String projectName = (String) iterator.next();
-            buffer.append(projectName);
-            if (iterator.hasNext()) {
-              buffer.append(", ");
-            }
-          }
-          System.out.println(buffer.toString());
-
-        }
+  private void printGroupedLicenses() {
+    for (Iterator iter = licenseMap.keySet().iterator(); iter.hasNext();) {
+      String licenseName = (String) iter.next();
+      if (StringUtils.isEmpty(licenseName)) {
+        System.out.println("unnamed");
+      } else {
+        System.out.println(licenseName + " : ");
       }
 
+      SortedSet projects = (SortedSet) licenseMap.get(licenseName);
+
+      StringBuffer buffer = new StringBuffer();
+      for (Iterator iterator = projects.iterator(); iterator.hasNext();) {
+        String projectName = (String) iterator.next();
+        buffer.append(projectName);
+        if (iterator.hasNext()) {
+          buffer.append(", ");
+        }
+      }
+      System.out.println(buffer.toString());
+
+    }
+  }
 
   /**
    * @return a valid HTML ID respecting <a
@@ -538,19 +546,18 @@ public class LicenseMojo extends AbstractLicenseMojo {
     return mavenProjectBuilder.buildFromRepository(projectArtifact, remoteRepositories, localRepository, allowStubModel);
   }
 
-
   /**
    * @return a list of included <code>Artifact</code> returned by the dependency
    *         tree.
    */
   public List getAllDependencies(DependencyNode dependencyTreeNode) {
-//    if (allDependencies != null) {
-//      return allDependencies;
-//    }
+    // if (allDependencies != null) {
+    // return allDependencies;
+    // }
 
     for (Iterator i = dependencyTreeNode.getChildren().iterator(); i.hasNext();) {
       DependencyNode dependencyNode = (DependencyNode) i.next();
-//      System.out.println("\t " + dependencyNode.getArtifact().getId());
+      // System.out.println("\t " + dependencyNode.getArtifact().getId());
       if (dependencyNode.getState() != DependencyNode.INCLUDED) {
         continue;
       }
@@ -589,7 +596,7 @@ public class LicenseMojo extends AbstractLicenseMojo {
         break;
       }
     }
-    
+
     if (valueList == null) {
       valueList = new TreeSet<MavenProjectComparable>();
     }
@@ -598,31 +605,30 @@ public class LicenseMojo extends AbstractLicenseMojo {
   }
 
   private void checkHeaders() throws MojoExecutionException, MojoFailureException {
-    getLog().info("Checking licenses...");
+    super.basedir = project.getBasedir();
+    getLog().info("Checking headers...");
     missingHeaders.clear();
-
+    super.project = project;
     execute(new Callback() {
       public void onHeaderNotFound(Document document, Header header) {
-          info("Missing header in: %s", document.getFile());
-          missingHeaders.add(document.getFile());
+        File file = document.getFile();
+        info("Missing header in: %s", file.getAbsolutePath());
+        missingHeaders.add(file);
       }
 
       public void onExistingHeader(Document document, Header header) {
-          debug("Header OK in: %s", document.getFile());
+        debug("Header OK in: %s", document.getFile());
       }
-  });
+    });
 
-  if (!missingHeaders.isEmpty()) {
+    if (!missingHeaders.isEmpty()) {
       if (failIfMissing) {
-          throw new MojoExecutionException("Some files do not have the expected license header");
+        throw new MojoExecutionException("Some files do not have the expected license header");
       } else {
-          getLog().warn("Some files do not have the expected license header");
+        getLog().warn("Some files do not have the expected license header");
       }
-  }
+    }
 
   }
-
-
-
 
 }
