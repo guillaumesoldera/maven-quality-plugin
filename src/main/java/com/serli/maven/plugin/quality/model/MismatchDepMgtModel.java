@@ -3,25 +3,28 @@ package com.serli.maven.plugin.quality.model;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.model.Dependency;
+
 public class MismatchDepMgtModel {
 
-  private Map mismatch;
+  private Map<Artifact, Dependency> mismatch;
   
-  private List exclusionErrors;
+  private List<Artifact> exclusionErrors;
 
-  public Map getMismatch() {
+  public Map<Artifact, Dependency> getMismatch() {
     return mismatch;
   }
 
-  public void setMismatch(Map mismatch) {
+  public void setMismatch(Map<Artifact, Dependency> mismatch) {
     this.mismatch = mismatch;
   }
 
-  public List getExclusionErrors() {
+  public List<Artifact> getExclusionErrors() {
     return exclusionErrors;
   }
 
-  public void setExclusionErrors(List exclusionErrors) {
+  public void setExclusionErrors(List<Artifact> exclusionErrors) {
     this.exclusionErrors = exclusionErrors;
   }
   

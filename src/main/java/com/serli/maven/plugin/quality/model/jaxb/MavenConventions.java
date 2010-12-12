@@ -10,7 +10,8 @@ import javax.xml.bind.annotation.XmlTransient;
 @XmlRootElement
 public class MavenConventions {
 
-
+  private NamingConventions namingConventions;
+  
   private FormattingConventions formattingConventions;
   
   @XmlTransient
@@ -46,6 +47,14 @@ public class MavenConventions {
     this.formattingConventions = formattingConventions;
   }
   
+  @XmlElement(name = "naming")
+  public NamingConventions getNamingConventions() {
+    return namingConventions;
+  }
+  
+  public void setNamingConventions(NamingConventions namingConventions) {
+    this.namingConventions = namingConventions;
+  }
   
   public int getPosition(String tagName) {
     int result = -1;

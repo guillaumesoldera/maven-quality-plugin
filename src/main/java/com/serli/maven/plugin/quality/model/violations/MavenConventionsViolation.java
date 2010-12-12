@@ -1,6 +1,6 @@
-package com.serli.maven.plugin.quality.model;
+package com.serli.maven.plugin.quality.model.violations;
 
-public class StructureConventionsViolation {
+public class MavenConventionsViolation {
 
   private String tagName;
   
@@ -8,13 +8,13 @@ public class StructureConventionsViolation {
   
   private String message;
   
-  public StructureConventionsViolation() {
+  public MavenConventionsViolation() {
     
   }
 
   
   
-  public StructureConventionsViolation(String tagName, int lineNumber, String message) {
+  public MavenConventionsViolation(String tagName, int lineNumber, String message) {
     super();
     this.tagName = tagName;
     this.lineNumber = lineNumber;
@@ -46,7 +46,5 @@ public class StructureConventionsViolation {
   public void setMessage(String message) {
     this.message = message;
   }
-  
-  
   
 }

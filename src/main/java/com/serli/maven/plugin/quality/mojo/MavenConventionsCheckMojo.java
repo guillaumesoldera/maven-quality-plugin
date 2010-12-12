@@ -5,22 +5,21 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
-import com.serli.maven.plugin.quality.model.StructureConventionsViolation;
 import com.serli.maven.plugin.quality.model.jaxb.MavenConventions;
-import com.serli.maven.plugin.quality.model.jaxb.Tag;
+import com.serli.maven.plugin.quality.model.violations.MavenConventionsViolation;
+import com.serli.maven.plugin.quality.model.violations.NamingConventionsViolation;
+import com.serli.maven.plugin.quality.model.violations.StructureConventionsViolation;
 import com.serli.maven.plugin.quality.parser.PomFileReader;
 import com.serli.maven.plugin.quality.util.Util;
 
@@ -71,12 +70,9 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
    * @required
    * @readonly
    */
-  private MavenProject project;
+//  private MavenProject project;
 
   public void execute() throws MojoExecutionException, MojoFailureException {
-
-    // TODO regarder le respect des conventions de nommage
-
 
     File f = outputDirectory;
 
@@ -95,15 +91,15 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
       PomFileReader pomFileReader = new PomFileReader(getLog());
 
       reader = new FileReader(pom);
-      List<StructureConventionsViolation> listViolation = pomFileReader.read(reader, true, true, conventions);
-
+      List<MavenConventionsViolation> listViolation = pomFileReader.checkMavenConventions(reader, true, true, conventions);
+      
       if (listViolation != null) {
         if (outputXML) {
-          StringBuffer writeFormattingViolation = writeFormattingViolation(listViolation);
-          Util.writeFile(writeFormattingViolation.toString(), outputFile, getLog());
+          StringBuffer writeViolation = writeConventionsViolation(listViolation);
+          Util.writeFile(writeViolation.toString(), outputFile, getLog());
         } else {
 
-          for (StructureConventionsViolation violation : listViolation) {
+          for (MavenConventionsViolation violation : listViolation) {
             getLog().info(violation.getMessage());
           }
         }
@@ -125,19 +121,38 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
     }
 
   }
-
-  private StringBuffer writeFormattingViolation(List<StructureConventionsViolation> listStructureConventionsViolations) {
+  
+  private StringBuffer writeConventionsViolation(List<MavenConventionsViolation> listViolation) {
     StringWriter out = new StringWriter();
     PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter(out);
-    writer.startElement("formattingViolations");
-    for (StructureConventionsViolation violation : listStructureConventionsViolations) {
-      writer = writeStructureConventionsViolation(writer, violation);
-    }
+    writer.startElement("mavenConventionsViolation");
+    List<StructureConventionsViolation> listStructureConventionsViolations = getStructureConventionsViolations(listViolation);
+    List<NamingConventionsViolation> listNamingConventionsViolations = getNamingConventionsViolations(listViolation);
+    writer = writeFormattingViolation(listStructureConventionsViolations, writer);
+    writer = writeNamingViolation(listNamingConventionsViolations, writer);
     writer.endElement();
     return out.getBuffer();
   }
 
-  private PrettyPrintXMLWriter writeStructureConventionsViolation(PrettyPrintXMLWriter writer, StructureConventionsViolation violation) {
+  private PrettyPrintXMLWriter writeNamingViolation(List<NamingConventionsViolation> listNamingConventionsViolations, PrettyPrintXMLWriter writer) {
+    writer.startElement("namingViolations");
+    for (NamingConventionsViolation violation : listNamingConventionsViolations) {
+      writer = writeMavenConventionsViolation(writer, violation);
+    }
+    writer.endElement();
+    return writer;
+  }
+  
+  private PrettyPrintXMLWriter writeFormattingViolation(List<StructureConventionsViolation> listStructureConventionsViolations, PrettyPrintXMLWriter writer) {
+    writer.startElement("formattingViolations");
+    for (StructureConventionsViolation violation : listStructureConventionsViolations) {
+      writer = writeMavenConventionsViolation(writer, violation);
+    }
+    writer.endElement();
+    return writer;
+  }
+
+  private PrettyPrintXMLWriter writeMavenConventionsViolation(PrettyPrintXMLWriter writer, MavenConventionsViolation violation) {
     if (violation != null) {
       writer.startElement("violation");
       writer.startElement("tag");
@@ -153,5 +168,29 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
     }
     return writer;
   }
-
+  
+  private List<StructureConventionsViolation> getStructureConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
+    List<StructureConventionsViolation> structureConventionsViolations = new ArrayList<StructureConventionsViolation>();
+    
+    for (MavenConventionsViolation violations : mavenConventionsViolations) {
+      if (violations instanceof StructureConventionsViolation) {
+        structureConventionsViolations.add((StructureConventionsViolation) violations);
+      }
+    }
+    
+    return structureConventionsViolations;
+  }
+  
+  private List<NamingConventionsViolation> getNamingConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
+    List<NamingConventionsViolation> namingConventionsViolations = new ArrayList<NamingConventionsViolation>();
+    
+    for (MavenConventionsViolation violations : mavenConventionsViolations) {
+      if (violations instanceof NamingConventionsViolation) {
+        namingConventionsViolations.add((NamingConventionsViolation) violations);
+      }
+    }
+    
+    return namingConventionsViolations;
+  }
+  
 }

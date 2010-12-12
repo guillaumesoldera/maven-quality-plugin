@@ -16,10 +16,8 @@ package com.serli.maven.plugin.quality.mojo;
  * limitations under the License.
  */
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -300,11 +298,12 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    * @return true if errors are found.
    * @throws MojoExecutionException
    */
+  @SuppressWarnings("unchecked")
   private MismatchDepMgtModel checkDependencyManagement() throws MojoExecutionException {
     boolean foundError = false;
     MismatchDepMgtModel mismatchDepMgtModel = new MismatchDepMgtModel();
-    Map mismatch = null;
-    List exclusionErrors = null;
+    Map<Artifact, Dependency> mismatch = null;
+    List<Artifact> exclusionErrors = null;
     getLog().info("Found Resolved Dependency / DependencyManagement mismatches:");
 
     List<Dependency> depMgtDependencies = null;
@@ -334,7 +333,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       // depMgt. That's ok.
       if (this.ignoreDirect) {
         getLog().info("\tIgnoring Direct Dependencies.");
-        Set directDependencies = project.getDependencyArtifacts();
+        Set<Artifact> directDependencies = project.getDependencyArtifacts();
         allDependencyArtifacts.removeAll(directDependencies);
       }
 
@@ -423,7 +422,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    *          resolved artifacts to be compared.
    * @return list of artifacts that should have been excluded.
    */
-  public List<Artifact> getExclusionErrors(Map exclusions, Set<Artifact> allDependencyArtifacts) {
+  public List<Artifact> getExclusionErrors(Map<String, Exclusion> exclusions, Set<Artifact> allDependencyArtifacts) {
     List<Artifact> list = new ArrayList<Artifact>();
 
     Iterator<Artifact> iter = allDependencyArtifacts.iterator();
@@ -457,7 +456,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
    * @return a map containing the resolved artifact as the key and the listed
    *         dependency as the value.
    */
-  public Map<Artifact, Dependency> getMismatch(Map depMgtMap, Set<Artifact> allDependencyArtifacts) {
+  public Map<Artifact, Dependency> getMismatch(Map<String, Dependency> depMgtMap, Set<Artifact> allDependencyArtifacts) {
     Map<Artifact, Dependency> mismatchMap = new HashMap<Artifact, Dependency>();
 
     Iterator<Artifact> iter = allDependencyArtifacts.iterator();
@@ -600,13 +599,13 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     return writer;
   }
 
-  private PrettyPrintXMLWriter writeMismatch(Map mismatch, PrettyPrintXMLWriter writer) {
+  private PrettyPrintXMLWriter writeMismatch(Map<Artifact, Dependency> mismatch, PrettyPrintXMLWriter writer) {
     if (mismatch != null) {
       writer.startElement("overridenVersions");
       Iterator<Artifact> mismatchIter = mismatch.keySet().iterator();
       while (mismatchIter.hasNext()) {
-        Artifact resolvedArtifact = (Artifact) mismatchIter.next();
-        Dependency depMgtDependency = (Dependency) mismatch.get(resolvedArtifact);
+        Artifact resolvedArtifact = mismatchIter.next();
+        Dependency depMgtDependency = mismatch.get(resolvedArtifact);
         writer = writeMismatch(resolvedArtifact, depMgtDependency, writer, true);
       }
       writer.endElement();

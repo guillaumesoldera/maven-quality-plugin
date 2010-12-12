@@ -57,8 +57,11 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParser;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 import com.serli.maven.plugin.quality.model.DependencyLocation;
-import com.serli.maven.plugin.quality.model.StructureConventionsViolation;
+import com.serli.maven.plugin.quality.model.jaxb.GroupId;
 import com.serli.maven.plugin.quality.model.jaxb.MavenConventions;
+import com.serli.maven.plugin.quality.model.violations.MavenConventionsViolation;
+import com.serli.maven.plugin.quality.model.violations.NamingConventionsViolation;
+import com.serli.maven.plugin.quality.model.violations.StructureConventionsViolation;
 import com.serli.maven.plugin.quality.util.Util;
 
 /**
@@ -73,6 +76,8 @@ public class PomFileReader {
    * Logger.
    */
   private Log log;
+  private int groupIdLineNumber;
+  private int artifactIdLineNumber;
 
   public Log getLog() {
     return log;
@@ -1460,18 +1465,16 @@ public class PomFileReader {
   } // -- MailingList parseMailingList(String, XmlPullParser, boolean, String)
 
   /**
-   * Method parseModel
+   * Method checkMavenConventions.
    * 
    * @param tagName
    * @param encoding
    * @param strict
    * @param parser
    */
-  private List<StructureConventionsViolation> parseModel(String tagName, XmlPullParser parser, boolean strict, String encoding,
+  private List<MavenConventionsViolation> checkMavenConventions(String tagName, XmlPullParser parser, boolean strict, String encoding,
       boolean checkSkipLine, boolean checkTabSpaced, MavenConventions mavenConventions) throws IOException, XmlPullParserException {
-    List<StructureConventionsViolation> listStructureConventionsViolations = new ArrayList<StructureConventionsViolation>();
-    Model model = new Model();
-    model.setModelEncoding(encoding);
+    List<MavenConventionsViolation> listMavenConventionsViolations = new ArrayList<MavenConventionsViolation>();
     int eventType = parser.getEventType();
     String previousTag = null;
     int previousTagLineNumber = -1;
@@ -1487,17 +1490,18 @@ public class PomFileReader {
             structureConventionsViolation.setLineNumber(parser.getLineNumber());
             structureConventionsViolation.setTagName(parser.getName());
             structureConventionsViolation.setMessage("The tag '" + parser.getName() + "' should be on first line");
-            listStructureConventionsViolations.add(structureConventionsViolation);
+            listMavenConventionsViolations.add(structureConventionsViolation);
           }
 
         } else if (parser.getDepth() == 2) {
+          
           int positionPrevious = mavenConventions.getPosition(previousTag);
           int positionTag = mavenConventions.getPosition(parser.getName());
           if (positionTag != -1 && positionPrevious != -1) {
             if (positionTag < positionPrevious) {
               String message = Util.buildOrderViolationMessage(parser.getLineNumber(), parser.getName(), previousTag);
               structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
-              listStructureConventionsViolations.add(structureConventionsViolation);
+              listMavenConventionsViolations.add(structureConventionsViolation);
             }
           }
           int spaceIndentWanted = mavenConventions.getSpaceIndent(parser.getName());
@@ -1509,7 +1513,7 @@ public class PomFileReader {
               String message = Util.buildTabSpacedViolationMessage(parser.getLineNumber(), parser.getName(), spaceIndentReal,
                   spaceIndentWanted);
               structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
-              listStructureConventionsViolations.add(structureConventionsViolation);
+              listMavenConventionsViolations.add(structureConventionsViolation);
             }
           }
           int skipLineWanted = -1;
@@ -1529,12 +1533,44 @@ public class PomFileReader {
             if (skipLineReal != skipLineWanted) {
               String message = Util.buildSkipLineViolationMessage(parser.getLineNumber(), previousTag, skipLineReal, skipLineWanted);
               structureConventionsViolation = new StructureConventionsViolation(parser.getName(), parser.getLineNumber(), message);
-              listStructureConventionsViolations.add(structureConventionsViolation);
+              listMavenConventionsViolations.add(structureConventionsViolation);
             }
           }
 
           previousTagLineNumber = parser.getLineNumber();
           previousTag = parser.getName();
+          
+          
+
+          if ("groupId".equals(parser.getName())) {
+            String tag = "groupId";
+            String groupId = parser.nextText();
+            groupIdLineNumber = parser.getLineNumber();
+            GroupId groupIdConvention = mavenConventions.getNamingConventions().getGroupId();
+            boolean groupIdOK = groupIdConvention.isMatching(groupId);
+            if (!groupIdOK) {
+              String message = Util.buildNamingViolationMessage(groupIdLineNumber, tag, mavenConventions.getNamingConventions().getGroupId().getPattern());
+              NamingConventionsViolation namingConventionsViolation = new NamingConventionsViolation(tag, groupIdLineNumber, message);
+              listMavenConventionsViolations.add(namingConventionsViolation);
+            }
+            boolean prefixGroupIdOK = groupIdConvention.isPrefixOk(groupId);
+            if (!prefixGroupIdOK) {
+              String message = Util.buildPrefixNamingViolationMessage(groupIdLineNumber, tag);
+              NamingConventionsViolation namingConventionsViolation = new NamingConventionsViolation(tag, groupIdLineNumber, message);
+              listMavenConventionsViolations.add(namingConventionsViolation);
+            }
+          }
+          if ("artifactId".equals(parser.getName())) {
+            String tag = "artifactId";
+            String artifactId = parser.nextText();
+            artifactIdLineNumber = parser.getLineNumber();
+            boolean artifactIdOK = mavenConventions.getNamingConventions().getArtifactId().isMatching(artifactId);
+            if (!artifactIdOK) {
+              String message = Util.buildNamingViolationMessage(artifactIdLineNumber, tag, mavenConventions.getNamingConventions().getArtifactId().getPattern());
+              NamingConventionsViolation namingConventionsViolation = new NamingConventionsViolation(tag, artifactIdLineNumber, message);
+              listMavenConventionsViolations.add(namingConventionsViolation);
+            }
+          }
         }
       } else if (eventType == XmlPullParser.END_TAG) {
         if (parser.getDepth() <= 2) {
@@ -1543,7 +1579,7 @@ public class PomFileReader {
       }
       eventType = parser.next();
     }
-    return listStructureConventionsViolations;
+    return listMavenConventionsViolations;
   } // -- List<StructureConventionsViolation> parseModel(String, XmlPullParser, boolean, String, boolean, boolean, MavenConventions)
 
   /**
@@ -2820,18 +2856,18 @@ public class PomFileReader {
   } // -- Site parseSite(String, XmlPullParser, boolean, String)
 
   /**
-   * Method read
+   * Method checkMavenConventions
    * 
    * @param reader
    * @param strict
    */
-  public List<StructureConventionsViolation> read(Reader reader, boolean strict, boolean checkSkipLine, boolean checkTabSpaced,
+  public List<MavenConventionsViolation> checkMavenConventions(Reader reader, boolean strict, boolean checkSkipLine, boolean checkTabSpaced,
       MavenConventions mavenConventions) throws IOException, XmlPullParserException {
     XmlPullParser parser = initParser(reader);
     String encoding = parser.getInputEncoding();
 
-    return parseModel("project", parser, strict, encoding, checkSkipLine, checkTabSpaced, mavenConventions);
-  } // -- List<StructureConventionsViolation> read(Reader, boolean)
+    return checkMavenConventions("project", parser, strict, encoding, checkSkipLine, checkTabSpaced, mavenConventions);
+  } 
 
   private XmlPullParser initParser(Reader reader) throws XmlPullParserException, IOException {
     XmlPullParser parser = new MXParser();
@@ -3109,17 +3145,17 @@ public class PomFileReader {
   }
 
   /**
-   * Method read. Parse pom file and loos if Maven conventions (tags order, skip
+   * Method checkMavenConventions. Parse pom file and loos if Maven conventions (tags order, skip
    * lines) are OK.
    * 
    * @param reader
    * @param checkSkipLine
    * @param mavenConventions
    */
-  public List<StructureConventionsViolation> read(Reader reader, boolean checkSkipLine, boolean checkTabSpaced,
+  public List<MavenConventionsViolation> checkMavenConventions(Reader reader, boolean checkSkipLine, boolean checkTabSpaced,
       MavenConventions mavenConventions) throws IOException, XmlPullParserException {
-    return read(reader, true, checkSkipLine, checkTabSpaced, mavenConventions);
-  } // -- List<StructureConventionsViolation> read(Reader)
+    return checkMavenConventions(reader, true, checkSkipLine, checkTabSpaced, mavenConventions);
+  } 
 
   /**
    * Build a list which contains dependency object and line number where this
@@ -3228,5 +3264,6 @@ public class PomFileReader {
     return dependencyLine;
   } // -- List<DependencyLocation> buildDependencyLineStructure(String,
     // XmlPullParser, String)
+
 
 }

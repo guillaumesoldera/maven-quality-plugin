@@ -8,6 +8,9 @@ import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -86,22 +89,36 @@ public final class Util {
   public static String buildOrderViolationMessage(int lineNumber, String tagName, String previousTagName) {
 
     return MessageFormat
-        .format("The tag \"{0}\" sould be before tag \"{1}\" (Line {2,number, integer}).", tagName, previousTagName, lineNumber);
+        .format("The tag {0} sould be before tag {1} (Line {2,number, integer}).", tagName, previousTagName, lineNumber);
 
   }
 
   public static String buildTabSpacedViolationMessage(int lineNumber, String tagName, int tabSpaceReal, int tabSpacedWanted) {
     return MessageFormat
         .format(
-            "There is {1,number, integer} space indents before tag \"{0}\". The wanted value is {2,number, integer}. (Line {3,number, integer}).",
+            "There is {1,number, integer} space indents before tag {0}. The wanted value is {2,number, integer}. (Line {3,number, integer}).",
             tagName, tabSpaceReal, tabSpacedWanted, lineNumber);
   }
 
   public static String buildSkipLineViolationMessage(int lineNumber, String tagName, int skipLineReal, int skipLineWanted) {
     return MessageFormat.format(
-        "There is {1,number, integer} line skipped after tag \"{0}\". The wanted value is {2,number, integer}. (Line {3,number, integer}).",
+        "There is {1,number, integer} line skipped after tag {0}. The wanted value is {2,number, integer}. (Line {3,number, integer}).",
         tagName, skipLineReal, skipLineWanted, lineNumber);
   }
+  
+  public static String buildNamingViolationMessage(int lineNumber, String tag, String pattern) {
+    return MessageFormat.format(
+        "{0} should match with pattern {1}. (Line {2,number, integer}).",
+        tag, pattern, lineNumber);
+  }
+  
+  public static String buildPrefixNamingViolationMessage(int lineNumber, String tag) {
+    return MessageFormat.format(
+        "{0} should start with top level domain names (com, edu, gov, mil, net, org) or one of the English two-letter codes identifying countries as specified in ISO Standard 3166. (Line {1,number, integer}).",
+        tag, lineNumber);
+  }
+  
+  
   
   /**
    * Write a string in outputFile. If outputFile is null, write in log.
@@ -135,5 +152,27 @@ public final class Util {
     }
 
     return URL_VALIDATOR.isValid(url);
+  }
+  
+  public static boolean isMatching(String pattern, String string) {
+    Pattern p = Pattern.compile(pattern);
+    Matcher m = p.matcher(string);
+    return m.matches();
+  }
+  
+  public static List<String> getAvailablesGroupIdPrefix() {
+    //com, edu, gov, mil, net, org
+    List<String> result = new ArrayList<String>();
+    result.add("com");
+    result.add("edu");
+    result.add("gov");
+    result.add("mil");
+    result.add("net");
+    result.add("org");
+    String[] isoCountries = Locale.getISOCountries();
+    for (String isoCountry : isoCountries) {
+      result.add(isoCountry.toLowerCase());
+    }
+    return result;
   }
 }

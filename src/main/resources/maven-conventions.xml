@@ -1,5 +1,4 @@
 <mavenConventions>
-
 	<formatting>
 		<groups>
 			<group>
@@ -243,5 +242,7 @@
 		</groups>
 	</formatting>
 	<naming>
+		<groupId format="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+		<artifactId format="^[a-z]+(\-[a-z][a-z0-9]*)*$"/>
 	</naming>
 </mavenConventions>
