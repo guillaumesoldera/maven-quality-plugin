@@ -1,0 +1,42 @@
+The <tt>maven-quality-plugin</tt> is a Maven plugin that checks quality of Maven pom file.
+It contains 3 mojos which analyze dependencies, maven conventions and licenses
+First mojo analyzes project dependencies and looks for used and declared, unused and declared, used and undeclared dependencies.
+It gets dependencies which override dependencies' version defined in parent project.
+This mojo is based from maven-dependency-plugin.
+
+Second mojo analyzes maven conventions check. The structure pom file conventions are defined here : http://maven.apache.org/developers/conventions/code.html and naming conventions are defined here : http://maven.apache.org/guides/mini/guide-naming-conventions.html.
+These conventions are written in maven-conventions.xml file.
+ 
+Third mojo gets info about project license and dependencies' licenses. It checks too headers in project file, header which must matches with license defined in pom file.
+This mojo is based from maven-project-info-dependencies plugin and maven-license-plugin.
+
+All mojos report results in XML format in console log or in a file, if 'outputFile' parameter is specified.
+
+Currently, the plugin is not in a public repository yet, so you'll have to build it yourself. First clone the git repository and then simply do
+
+    mvn install
+
+This will install the plugin into your local repository and make it available for use. To make commandline usage a bit easier, you should add the
+<tt>com.serli.maven.plugins</tt> group to the <tt>pluginGroups</tt> section in your settings file:
+
+    <settings>
+      ...
+      <pluginGroups>
+        <pluginGroup>com.serli.maven.plugins</pluginGroup>
+      </pluginGroups>
+      ...
+    </settings>
+
+
+Usually, the plugin does not need to be configured in the POM. You can simply execute it via maven command line in a directory that contains a POM
+(which can be a multi-module POM):
+
+    mvn quality:analyze-dependencies to run first mojo
+    mvn quality:check-maven-conventions to run second mojo
+    mvn quality:license to run third mojo
+
+This will check for the latest version of the plugin, download it if necessary, and then execute it. Note that you might get snapshot versions this way.
+You can also run a specific version using the fully qualified plugin identifier:
+
+    mvn com.serli.maven.plugins:maven-quality-plugin:<version>:<goal>
+
