@@ -141,27 +141,26 @@ public class LicenseMojo extends AbstractLicenseMojo {
   /**
    * Will be filled with license name / set of projects.
    */
-//  private Map licenseMap = new HashMap() {
-//    /** {@inheritDoc} */
-//    public Object put(Object key, Object value) {
-//      // handle multiple values as a set to avoid duplicates
-//      SortedSet valueList = (SortedSet) get(key);
-//      if (valueList == null) {
-//        valueList = new TreeSet();
-//      }
-//      valueList.add(value);
-//      return super.put(key, valueList);
-//    }
-//  };
+  private Map licenseMap = new HashMap() {
+    /** {@inheritDoc} */
+    public Object put(Object key, Object value) {
+      // handle multiple values as a set to avoid duplicates
+      SortedSet valueList = (SortedSet) get(key);
+      if (valueList == null) {
+        valueList = new TreeSet();
+      }
+      valueList.add(value);
+      return super.put(key, valueList);
+    }
+  };
 
   private List<LightLicense> projectLicenses = null;
 
   /** Random used to generate a UID */
   private static SecureRandom RANDOM;
 
-  private List<Artifact> allDependencies = new ArrayList<Artifact>();
+  private List allDependencies = new ArrayList();
 
-  @SuppressWarnings("unchecked")
   public void execute() throws MojoExecutionException, MojoFailureException {
     try {
       RANDOM = SecureRandom.getInstance("SHA1PRNG");
@@ -180,9 +179,9 @@ public class LicenseMojo extends AbstractLicenseMojo {
     // TODO voir comment ils gerent avec le DependenciesRenderer :
     // http://svn.apache.org/viewvc/maven/plugins/tags/maven-project-info-reports-plugin-2.2/src/main/java/org/apache/maven/report/projectinfo/dependencies/renderer/DependenciesRenderer.java?view=markup
     projectLicenses = new ArrayList<LightLicense>();
-    List<License> licenses = project.getModel().getLicenses();
-    for (Iterator<License> i = licenses.iterator(); i.hasNext();) {
-      License license = i.next();
+    List licenses = project.getModel().getLicenses();
+    for (Iterator i = licenses.iterator(); i.hasNext();) {
+      License license = (License) i.next();
       LightLicense projectLicense = new LightLicense();
       projectLicense.setName(license.getName());
       projectLicense.setUrl(license.getUrl());
@@ -380,17 +379,19 @@ public class LicenseMojo extends AbstractLicenseMojo {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void stockAllArtifactAndItsLicense(DependencyNode node) {
+    Artifact artifact = node.getArtifact();
+    String id = artifact.getId();
     String dependencyDetailId = getUUID();
+    String imgId = getUUID();
 
     stockArtifactAndItsLicense(node, dependencyDetailId);
 
     if (!node.getChildren().isEmpty()) {
       boolean toBeIncluded = false;
-      List<DependencyNode> subList = new ArrayList<DependencyNode>();
-      for (Iterator<DependencyNode> deps = node.getChildren().iterator(); deps.hasNext();) {
-        DependencyNode dep = deps.next();
+      List subList = new ArrayList();
+      for (Iterator deps = node.getChildren().iterator(); deps.hasNext();) {
+        DependencyNode dep = (DependencyNode) deps.next();
 
         if (!allDependencies.contains(dep.getArtifact())) {
           continue;
@@ -401,8 +402,8 @@ public class LicenseMojo extends AbstractLicenseMojo {
       }
 
       if (toBeIncluded) {
-        for (Iterator<DependencyNode> deps = subList.iterator(); deps.hasNext();) {
-          DependencyNode dep = deps.next();
+        for (Iterator deps = subList.iterator(); deps.hasNext();) {
+          DependencyNode dep = (DependencyNode) deps.next();
 
           stockAllArtifactAndItsLicense(dep);
         }
@@ -411,7 +412,6 @@ public class LicenseMojo extends AbstractLicenseMojo {
 
   }
 
-  @SuppressWarnings("unchecked")
   private void stockArtifactAndItsLicense(DependencyNode node, String uid) {
     Artifact artifact = node.getArtifact();
     String id = artifact.getId();
@@ -423,7 +423,7 @@ public class LicenseMojo extends AbstractLicenseMojo {
           MavenProjectComparable artifactProject = new MavenProjectComparable(getMavenProjectFromRepository(artifact));
           String artifactDescription = artifactProject.getDescription();
           String artifactUrl = artifactProject.getUrl();
-          List<License> licenses = artifactProject.getLicenses();
+          List licenses = artifactProject.getLicenses();
 
           if (StringUtils.isNotEmpty(artifactDescription)) {
             // System.out.println("artifactDescription : " +
@@ -439,7 +439,7 @@ public class LicenseMojo extends AbstractLicenseMojo {
           }
 
           if (!licenses.isEmpty()) {
-            for (Iterator<License> iter = licenses.iterator(); iter.hasNext();) {
+            for (Iterator iter = licenses.iterator(); iter.hasNext();) {
               License element = (License) iter.next();
               String licenseName = element.getName();
               String licenseUrl = element.getUrl();
@@ -465,53 +465,53 @@ public class LicenseMojo extends AbstractLicenseMojo {
 
   }
 
-//  private void printLicenses() {
-//    // TODO afficher au format XML et dans un fichier ou non
-//    Set<LightLicense> keys = resultLicenseMap.keySet();
-//    for (LightLicense license : keys) {
-//      String url = license.getUrl();
-//      String name = license.getName();
-//      if (StringUtils.isEmpty(name)) {
-//        name = "Unnamed";
-//      }
-//      System.out.println("Licence " + name + " - " + url);
-//      SortedSet<MavenProjectComparable> sortedSet = resultLicenseMap.get(license);
-//      for (MavenProject artifact : sortedSet) {
-//        System.out.println("\t " + artifact.getId());
-//      }
-//
-//    }
-//
-//    System.out.println("Inconnu : ");
-//    for (MavenProject project : setArtifactNoLicense) {
-//      System.out.println("\t " + project.getId());
-//    }
-//
-//  }
-//
-//  private void printGroupedLicenses() {
-//    for (Iterator iter = licenseMap.keySet().iterator(); iter.hasNext();) {
-//      String licenseName = (String) iter.next();
-//      if (StringUtils.isEmpty(licenseName)) {
-//        System.out.println("unnamed");
-//      } else {
-//        System.out.println(licenseName + " : ");
-//      }
-//
-//      SortedSet projects = (SortedSet) licenseMap.get(licenseName);
-//
-//      StringBuffer buffer = new StringBuffer();
-//      for (Iterator iterator = projects.iterator(); iterator.hasNext();) {
-//        String projectName = (String) iterator.next();
-//        buffer.append(projectName);
-//        if (iterator.hasNext()) {
-//          buffer.append(", ");
-//        }
-//      }
-//      System.out.println(buffer.toString());
-//
-//    }
-//  }
+  private void printLicenses() {
+    // TODO afficher au format XML et dans un fichier ou non
+    Set<LightLicense> keys = resultLicenseMap.keySet();
+    for (LightLicense license : keys) {
+      String url = license.getUrl();
+      String name = license.getName();
+      if (StringUtils.isEmpty(name)) {
+        name = "Unnamed";
+      }
+      System.out.println("Licence " + name + " - " + url);
+      SortedSet<MavenProjectComparable> sortedSet = resultLicenseMap.get(license);
+      for (MavenProject artifact : sortedSet) {
+        System.out.println("\t " + artifact.getId());
+      }
+
+    }
+
+    System.out.println("Inconnu : ");
+    for (MavenProject project : setArtifactNoLicense) {
+      System.out.println("\t " + project.getId());
+    }
+
+  }
+
+  private void printGroupedLicenses() {
+    for (Iterator iter = licenseMap.keySet().iterator(); iter.hasNext();) {
+      String licenseName = (String) iter.next();
+      if (StringUtils.isEmpty(licenseName)) {
+        System.out.println("unnamed");
+      } else {
+        System.out.println(licenseName + " : ");
+      }
+
+      SortedSet projects = (SortedSet) licenseMap.get(licenseName);
+
+      StringBuffer buffer = new StringBuffer();
+      for (Iterator iterator = projects.iterator(); iterator.hasNext();) {
+        String projectName = (String) iterator.next();
+        buffer.append(projectName);
+        if (iterator.hasNext()) {
+          buffer.append(", ");
+        }
+      }
+      System.out.println(buffer.toString());
+
+    }
+  }
 
   /**
    * @return a valid HTML ID respecting <a
@@ -550,13 +550,12 @@ public class LicenseMojo extends AbstractLicenseMojo {
    * @return a list of included <code>Artifact</code> returned by the dependency
    *         tree.
    */
-  @SuppressWarnings("unchecked")
-  public List<Artifact> getAllDependencies(DependencyNode dependencyTreeNode) {
+  public List getAllDependencies(DependencyNode dependencyTreeNode) {
     // if (allDependencies != null) {
     // return allDependencies;
     // }
 
-    for (Iterator<DependencyNode> i = dependencyTreeNode.getChildren().iterator(); i.hasNext();) {
+    for (Iterator i = dependencyTreeNode.getChildren().iterator(); i.hasNext();) {
       DependencyNode dependencyNode = (DependencyNode) i.next();
       // System.out.println("\t " + dependencyNode.getArtifact().getId());
       if (dependencyNode.getState() != DependencyNode.INCLUDED) {
@@ -582,6 +581,7 @@ public class LicenseMojo extends AbstractLicenseMojo {
     // handle multiple values as a set to avoid duplicates
     SortedSet<MavenProjectComparable> valueList = null;
     Set<LightLicense> keySet = resultLicenseMap.keySet();
+    String url = key.getUrl();
     for (LightLicense license : keySet) {
       String urlLicense = license.getUrl();
       String nameLicense = license.getName();
