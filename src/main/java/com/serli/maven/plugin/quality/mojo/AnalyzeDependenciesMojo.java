@@ -25,16 +25,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.doxia.sink.Sink;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.Exclusion;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.reporting.MavenReportException;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalysis;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzer;
 import org.apache.maven.shared.dependency.analyzer.ProjectDependencyAnalyzerException;
@@ -54,16 +55,7 @@ import com.serli.maven.plugin.quality.util.Util;
  * @requiresDependencyResolution test
  * @execute phase="test-compile"
  */
-public class AnalyzeDependenciesMojo extends AbstractMojo {
-
-  /**
-   * The Maven project to analyze.
-   * 
-   * @parameter expression="${project}"
-   * @required
-   * @readonly
-   */
-  private MavenProject project;
+public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
   /**
    * The Maven project dependency analyzer to use.
@@ -132,11 +124,24 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private boolean outputXML;
 
   /**
-   * Structure which contains dependencies and line number where the dependency is declared in pom file.
+   * Structure which contains dependencies and line number where the dependency
+   * is declared in pom file.
    */
   private List<DependencyLocation> dependencyLocationList;
 
-  public void execute() throws MojoExecutionException {
+  private StringBuffer dependenciesResult;
+
+  private Set<Artifact> usedDeclared;
+
+  private Set<Artifact> usedUndeclared;
+
+  private Set<Artifact> unusedDeclared;
+
+  private Map<Dependency, List<Integer>> checkUniqueDeclaration;
+
+  private MismatchDepMgtModel mismatchDepMgtModel;
+
+  public void execution() throws MojoExecutionException {
 
     // TODO regarder si les dépendances sont triées. (bonne pratique : groupée
     // par groupId ou par scope)
@@ -147,7 +152,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       f.mkdirs();
     }
 
-    if ("pom".equals(project.getPackaging())) {
+    if ("pom".equals(getProject().getPackaging())) {
       getLog().info("Skipping pom project");
       return;
     }
@@ -189,9 +194,12 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   }
 
   /**
-   * Check if a dependency is declared many times in looking for in List<DependencyLocation> structure built before.
+   * Check if a dependency is declared many times in looking for in
+   * List<DependencyLocation> structure built before.
+   * 
    * @see #buildDependenciesLineStructure()
-   * @return Map contains dependency and lines where this dependency is declared many times.
+   * @return Map contains dependency and lines where this dependency is declared
+   *         many times.
    */
   private Map<Dependency, List<Integer>> checkUniqueDeclaration() {
 
@@ -199,8 +207,9 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     for (DependencyLocation dependencyLocation : dependencyLocationList) {
       Dependency depDefined = dependencyLocation.getDependency();
       boolean alreadyCheck = false;
-      
-      // we looks if this dependency is not already checked and put in result map.
+
+      // we looks if this dependency is not already checked and put in result
+      // map.
       for (Dependency dep : multipleDefinitions.keySet()) {
         if (dep.getGroupId().equals(depDefined.getGroupId()) && dep.getArtifactId().equals(depDefined.getArtifactId())) {
           alreadyCheck = true;
@@ -223,15 +232,16 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
   private boolean checkDependencies() throws MojoExecutionException, IOException {
     ProjectDependencyAnalysis analysis;
     try {
-      analysis = analyzer.analyze(project);
+      analysis = analyzer.analyze(getProject());
     } catch (ProjectDependencyAnalyzerException exception) {
       throw new MojoExecutionException("Cannot analyze dependencies", exception);
     }
 
-    Set<Artifact> usedDeclared = analysis.getUsedDeclaredArtifacts();
-    Set<Artifact> usedUndeclared = analysis.getUsedUndeclaredArtifacts();
-    Set<Artifact> unusedDeclared = analysis.getUnusedDeclaredArtifacts();
+    usedDeclared = analysis.getUsedDeclaredArtifacts();
+    usedUndeclared = analysis.getUsedUndeclaredArtifacts();
+    unusedDeclared = analysis.getUnusedDeclaredArtifacts();
 
+    // TODO voir si on garde tous les scopes, même runtime....
     if (ignoreNonCompile) {
       Set<Artifact> filteredUnusedDeclared = new HashSet<Artifact>(unusedDeclared);
       Iterator<Artifact> iter = filteredUnusedDeclared.iterator();
@@ -249,18 +259,18 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       return false;
     }
 
-    Map<Dependency, List<Integer>> checkUniqueDeclaration = null;
+    checkUniqueDeclaration = null;
     if (uniqueDeclaration) {
       checkUniqueDeclaration = checkUniqueDeclaration();
     }
 
-    MismatchDepMgtModel mismatchDepMgtModel = new MismatchDepMgtModel();
+    mismatchDepMgtModel = new MismatchDepMgtModel();
     if (analyzeDepMgt) {
       mismatchDepMgtModel = checkDependencyManagement();
     }
 
     if (outputXML) {
-      StringBuffer dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
+      dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
           checkUniqueDeclaration);
       Util.writeFile(dependenciesResult.toString(), outputFile, getLog());
     } else {
@@ -308,7 +318,7 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
 
     List<Dependency> depMgtDependencies = null;
 
-    DependencyManagement depMgt = project.getDependencyManagement();
+    DependencyManagement depMgt = getProject().getDependencyManagement();
     if (depMgt != null) {
       depMgtDependencies = depMgt.getDependencies();
     }
@@ -327,13 +337,13 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
       }
 
       // get dependencies for the project (including transitive)
-      Set<Artifact> allDependencyArtifacts = new HashSet<Artifact>(project.getArtifacts());
+      Set<Artifact> allDependencyArtifacts = new HashSet<Artifact>(getProject().getArtifacts());
 
       // don't warn if a dependency that is directly listed overrides
       // depMgt. That's ok.
       if (this.ignoreDirect) {
         getLog().info("\tIgnoring Direct Dependencies.");
-        Set<Artifact> directDependencies = project.getDependencyArtifacts();
+        Set<Artifact> directDependencies = getProject().getDependencyArtifacts();
         allDependencyArtifacts.removeAll(directDependencies);
       }
 
@@ -687,6 +697,220 @@ public class AnalyzeDependenciesMojo extends AbstractMojo {
     return writer;
   }
 
- 
+  @Override
+  protected void executeReport(Locale locale) throws MavenReportException {
+    try {
+      outputReportDirectory.mkdirs();
+      execution();
+
+      Sink sink = getSink();
+      sink.head();
+      sink.title();
+      sink.text(getOutputName());
+      sink.title_();
+      sink.head_();
+
+      sink.body();
+      sink.paragraph();
+      sink.text(getDescription(locale));
+      sink.paragraph_();
+      sink.text(getI18nString(locale, "intro"));
+      sink.list();
+      sink.listItem();
+      sink.link("useddeclared");
+      sink.text(getI18nString(locale, "useddeclared.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.listItem();
+      sink.link("unuseddeclared");
+      sink.text(getI18nString(locale, "unuseddeclared.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.listItem();
+      sink.link("usedundeclared");
+      sink.text(getI18nString(locale, "usedundeclared.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.listItem();
+      sink.link("overriden");
+      sink.text(getI18nString(locale, "overriden.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.listItem();
+      sink.link("multiple");
+      sink.text(getI18nString(locale, "multiple.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.listItem();
+      sink.link("exclusions");
+      sink.text(getI18nString(locale, "exclusions.description"));
+      sink.link_();
+      sink.listItem_();
+      sink.list_();
+      // usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
+      // checkUniqueDeclaration
+
+      writeSection(sink, usedDeclared, "useddeclared", locale, true);
+      writeSection(sink, usedUndeclared, "usedundeclared", locale, false);
+      writeSection(sink, unusedDeclared, "unuseddeclared", locale, true);
+
+      writeOverridenVersion(sink, locale);
+
+      writeMultipleDeclaration(sink, locale);
+
+      // TODO ecrire les exclusions errors
+
+//      sink.text(dependenciesResult.toString());
+      sink.body_();
+      sink.flush();
+      sink.close();
+
+    } catch (MojoExecutionException e) {
+      // TODO Auto-generated catch block
+      throw new MavenReportException("MavenReportException", e);
+    }
+
+  }
+
+  private void writeSection(Sink sink, Set<Artifact> artifacts, String key, Locale locale, boolean lineNumber) {
+    writeBegin(sink, key, locale);
+    if (artifacts != null && !artifacts.isEmpty()) {
+      sink.table();
+      writeHeaderCell(sink, getI18nString(locale, "groupid"));
+      writeHeaderCell(sink, getI18nString(locale, "artifactid"));
+      writeHeaderCell(sink, getI18nString(locale, "version"));
+      writeHeaderCell(sink, getI18nString(locale, "scope"));
+      if (lineNumber) {
+        writeHeaderCell(sink, getI18nString(locale, "linenumber"));
+      }
+      for (Artifact artifact : artifacts) {
+        sink.tableRow();
+        writeCell(sink, artifact.getGroupId());
+        writeCell(sink, artifact.getArtifactId());
+        writeCell(sink, artifact.getBaseVersion());
+        writeCell(sink, artifact.getScope());
+        if (lineNumber) {
+          writeCell(sink, "" + Util.getLastDefinitionLine(dependencyLocationList, artifact.getGroupId(), artifact.getArtifactId()));
+        }
+        sink.tableRow_();
+      }
+
+      sink.table_();
+    } else {
+      sink.text(getI18nString(locale, "noentry"));
+    }
+
+    writeEnd(sink);
+  }
+
+  private void writeMultipleDeclaration(Sink sink, Locale locale) {
+    writeBegin(sink, "multiple", locale);
+    if (checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty()) {
+      sink.table();
+      writeHeaderCell(sink, getI18nString(locale, "artifact"));
+      writeHeaderCell(sink, getI18nString(locale, "linesdeclaration"));
+      for (Dependency dep : checkUniqueDeclaration.keySet()) {
+        sink.tableRow();
+        StringBuffer buffer = new StringBuffer("<groupId>");
+        buffer = buffer.append(dep.getGroupId());
+        buffer = buffer.append("</groupId>\n");
+        sink.tableCell();
+        sink.text(buffer.toString());
+        sink.lineBreak();
+        buffer = new StringBuffer("<artifactId>");
+        buffer = buffer.append(dep.getArtifactId());
+        buffer = buffer.append("</artifactId>");
+        sink.text(buffer.toString());
+        sink.tableCell_();
+        sink.tableCell();
+        sink.table();
+        List<Integer> list = checkUniqueDeclaration.get(dep);
+        for (Integer line : list) {
+          sink.tableRow();
+          writeCell(sink, line.toString());
+          sink.tableRow_();
+        }
+        sink.table_();
+        sink.tableCell_();
+        sink.tableRow_();
+        
+      }
+      sink.table_();
+    } else {
+      sink.text(getI18nString(locale, "noentry"));
+    }
+    writeEnd(sink);
+  }
+  
+  private void writeOverridenVersion(Sink sink, Locale locale) {
+    writeBegin(sink, "overriden", locale);
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched()) {
+      sink.table();
+      writeHeaderCell(sink, getI18nString(locale, "groupid"));
+      writeHeaderCell(sink, getI18nString(locale, "artifactid"));
+      writeHeaderCell(sink, getI18nString(locale, "versionDepMgt"));
+      writeHeaderCell(sink, getI18nString(locale, "versionResolved"));
+      writeHeaderCell(sink, getI18nString(locale, "linenumber"));
+      Map<Artifact, Dependency> mismatch = mismatchDepMgtModel.getMismatch();
+      Iterator<Artifact> mismatchIter = mismatch.keySet().iterator();
+      while (mismatchIter.hasNext()) {
+        Artifact resolvedArtifact = mismatchIter.next();
+        Dependency depMgtDependency = mismatch.get(resolvedArtifact);
+        if (resolvedArtifact != null && depMgtDependency != null) {
+          sink.tableRow();
+          writeCell(sink, depMgtDependency.getGroupId());
+          writeCell(sink, depMgtDependency.getArtifactId());
+          writeCell(sink, depMgtDependency.getVersion());
+          writeCell(sink, resolvedArtifact.getBaseVersion());
+          writeCell(sink,
+              "" + Util.getLastDefinitionLine(dependencyLocationList, resolvedArtifact.getGroupId(), resolvedArtifact.getArtifactId()));
+          sink.tableRow_();
+        }
+      }
+
+      sink.table_();
+    } else {
+      sink.text(getI18nString(locale, "noentry"));
+    }
+    writeEnd(sink);
+  }
+
+  private void writeCell(Sink sink, String contents) {
+    sink.tableCell();
+    sink.text(contents);
+    sink.tableCell_();
+  }
+
+  private void writeHeaderCell(Sink sink, String contents) {
+    sink.tableHeaderCell();
+    sink.text(contents);
+    sink.tableHeaderCell_();
+  }
+
+  private void writeEnd(Sink sink) {
+    sink.section1_();
+  }
+
+  private void writeBegin(Sink sink, String key, Locale locale) {
+    sink.section1();
+    sink.sectionTitle1();
+    sink.anchor(key);
+    sink.text(getI18nString(locale, key + ".name"));
+    sink.anchor_();
+    sink.sectionTitle1_();
+    sink.paragraph();
+    sink.text(getI18nString(locale, key + ".description"));
+    sink.paragraph_();
+  }
+
+  /** {@inheritDoc} */
+  public String getOutputName() {
+    return "dependencies-analysis";
+  }
+
+  @Override
+  protected String getI18Nsection() {
+    return "dependencies";
+  }
 
 }
