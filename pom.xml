@@ -1,5 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.serli.maven.plugins</groupId>
@@ -8,14 +7,16 @@
 	<packaging>maven-plugin</packaging>
 
 	<name>Maven Quality Plugin</name>
-	<url>http://maven.apache.org</url>
 	<description>Analyze pom quality (used and unused dependencies, Maven conventions check) and report</description>
-	<inceptionYear>2010</inceptionYear>
-
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.version>2.0.9</maven.version>
-	</properties>
+	<url>http://maven.apache.org</url>
+	<inceptionYear>2010</inceptionYear>	
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
 
 	<developers>
 		<developer>
@@ -27,13 +28,10 @@
 		</developer>
 	</developers>
 
-	<licenses>
-		<license>
-			<name>The Apache Software License, Version 2.0</name>
-			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-			<distribution>repo</distribution>
-		</license>
-	</licenses>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.version>2.0.9</maven.version>
+	</properties>
 
 	<dependencies>
 
