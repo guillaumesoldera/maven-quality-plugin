@@ -78,6 +78,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
    * Output file.
    * 
    * @parameter expression="${outputFile}"
+   *            default-value="target/reports/dependencies-analysis.xml"
    */
   private File outputFile;
 
@@ -114,14 +115,21 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
    * 
    * @parameter expression="${ignoreDirect}" default-value="false"
    */
-  private boolean ignoreDirect = false;
+  private boolean ignoreDirect;
 
   /**
-   * Output the xml for the dependencies analyze report.
+   * Output the xml for the dependencies analyze report in log console.
    * 
-   * @parameter expression="${outputXML}" default-value="true"
+   * @parameter expression="${outputXML}" default-value="false"
    */
   private boolean outputXML;
+
+  /**
+   * Print results in log console.
+   * 
+   * @parameter expression="${logConsole}" default-value="true"
+   */
+  private boolean logConsole;
 
   /**
    * Structure which contains dependencies and line number where the dependency
@@ -143,6 +151,16 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
   public void execution() throws MojoExecutionException {
 
+    if ("pom".equals(getProject().getPackaging())) {
+      getLog().info("Skipping pom project");
+      return;
+    }
+
+    if (outputDirectory == null || !outputDirectory.exists()) {
+      getLog().info("Skipping project with no build directory");
+      return;
+    }
+
     // TODO regarder si les dépendances sont triées. (bonne pratique : groupée
     // par groupId ou par scope)
 
@@ -152,14 +170,15 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       f.mkdirs();
     }
 
-    if ("pom".equals(getProject().getPackaging())) {
-      getLog().info("Skipping pom project");
-      return;
-    }
-
-    if (outputDirectory == null || !outputDirectory.exists()) {
-      getLog().info("Skipping project with no build directory");
-      return;
+    File output = outputFile;
+    if (output != null && !output.exists()) {
+      int lastPathSeparator = outputFile.getPath().lastIndexOf(File.separatorChar);
+      if (lastPathSeparator != -1) {
+        String directoryPath = outputFile.getPath().substring(0, lastPathSeparator);
+        File directory = new File(directoryPath);
+        directory.mkdirs();
+      }
+      output = new File(outputFile.getPath());
     }
 
     boolean warningDep;
@@ -179,6 +198,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       throw new MojoExecutionException("Analyze problem", e);
     }
 
+    getLog().info("results are available in " + outputFile.getPath());
   }
 
   // private methods --------------------------------------------------------
@@ -255,7 +275,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     }
 
     if ((usedDeclared.isEmpty()) && usedUndeclared.isEmpty() && unusedDeclared.isEmpty()) {
-      getLog().info("No dependency problems found");
+      getLog().info("No dependency found");
       return false;
     }
 
@@ -269,27 +289,35 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       mismatchDepMgtModel = checkDependencyManagement();
     }
 
-    if (outputXML) {
-      dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
-          checkUniqueDeclaration);
-      Util.writeFile(dependenciesResult.toString(), outputFile, getLog());
-    } else {
-      if (!usedDeclared.isEmpty()) {
-        getLog().info("Used declared dependencies found:");
-        logArtifacts(analysis.getUsedDeclaredArtifacts(), false);
-      }
-      if (!usedUndeclared.isEmpty()) {
-        getLog().warn("Used undeclared dependencies found:");
-        logArtifacts(usedUndeclared, true);
-      }
-      if (!unusedDeclared.isEmpty()) {
-        getLog().warn("Unused declared dependencies found:");
-        logArtifacts(unusedDeclared, true);
-      }
+    dependenciesResult = writeDependenciesResult(usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel, checkUniqueDeclaration);
+    Util.writeFile(dependenciesResult.toString(), outputFile, getLog());
+    if (logConsole) {
+      if (outputXML) {
+        getLog().info(dependenciesResult.toString());
+      } else {
+        if (!usedDeclared.isEmpty()) {
+          getLog().info("Used declared dependencies found:");
+          logArtifacts(analysis.getUsedDeclaredArtifacts(), false);
+        }
+        if (!usedUndeclared.isEmpty()) {
+          getLog().info("Used undeclared dependencies found:");
+          logArtifacts(usedUndeclared, true);
+        }
+        if (!unusedDeclared.isEmpty()) {
+          getLog().info("Unused declared dependencies found:");
+          logArtifacts(unusedDeclared, true);
+        }
+        if (checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty()) {
+          getLog().info("multiple declaration found");
+          logMultipleDeclaration(checkUniqueDeclaration);
+        }
 
+        // TODO afficher aussi les exclusion error, multiple declaration et
+        // overriden version
+      }
     }
 
-    boolean hasMismatch = (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched());
+    boolean hasMismatch = (mismatchDepMgtModel != null && (mismatchDepMgtModel.hasMismatches() || mismatchDepMgtModel.hasExclusionErrors()));
     boolean multipleDeclaration = checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty();
 
     boolean result = !usedUndeclared.isEmpty() || !unusedDeclared.isEmpty();
@@ -310,7 +338,6 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
    */
   @SuppressWarnings("unchecked")
   private MismatchDepMgtModel checkDependencyManagement() throws MojoExecutionException {
-    boolean foundError = false;
     MismatchDepMgtModel mismatchDepMgtModel = new MismatchDepMgtModel();
     Map<Artifact, Dependency> mismatch = null;
     List<Artifact> exclusionErrors = null;
@@ -349,29 +376,25 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
       // log exclusion errors
       exclusionErrors = getExclusionErrors(exclusions, allDependencyArtifacts);
-      if (exclusionErrors != null && exclusionErrors.size() > 0) {
-        foundError = true;
+
+      if (logConsole && !outputXML) {
+        for (Artifact exclusion : exclusionErrors) {
+          getLog().info(
+              StringUtils.stripEnd(getArtifactManagementKey(exclusion), ":") + " was excluded in DepMgt, but version "
+                  + exclusion.getVersion() + " has been found in the dependency tree.");
+        }
       }
-      // while (exclusionIter.hasNext()) {
-      // Artifact exclusion = (Artifact) exclusionIter.next();
-      // getLog().info(
-      // StringUtils.stripEnd(getArtifactManagementKey(exclusion), ":") +
-      // " was excluded in DepMgt, but version "
-      // + exclusion.getVersion() + " has been found in the dependency tree.");
-      // }
 
       // find and log version mismatches
       mismatch = getMismatch(depMgtMap, allDependencyArtifacts);
-      // Iterator mismatchIter = mismatch.keySet().iterator();
-      // while ( mismatchIter.hasNext() )
-      // {
-      // Artifact resolvedArtifact = (Artifact) mismatchIter.next();
-      // Dependency depMgtDependency = (Dependency) mismatch.get(
-      // resolvedArtifact );
-      // logMismatch( resolvedArtifact, depMgtDependency );
-      // }
-      if (!foundError) {
-        getLog().info("   None");
+
+      if (logConsole && !outputXML) {
+        Iterator<Artifact> mismatchIter = mismatch.keySet().iterator();
+        while (mismatchIter.hasNext()) {
+          Artifact resolvedArtifact = mismatchIter.next();
+          Dependency depMgtDependency = mismatch.get(resolvedArtifact);
+          logMismatch(resolvedArtifact, depMgtDependency);
+        }
       }
     } else {
       getLog().info("   Nothing in DepMgt.");
@@ -385,7 +408,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
   private void logArtifacts(Set<Artifact> artifacts, boolean warn) throws IOException {
     if (artifacts.isEmpty()) {
-      Util.writeFile("   None", outputFile, getLog());
+      getLog().info("   None");
     } else {
       for (Iterator<Artifact> iterator = artifacts.iterator(); iterator.hasNext();) {
         Artifact artifact = iterator.next();
@@ -394,8 +417,19 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
         // do this. MNG-2961
         artifact.isSnapshot();
 
-        Util.writeFile("   " + artifact, outputFile, getLog());
+        getLog().info("   " + artifact);
 
+      }
+    }
+  }
+
+  private void logMultipleDeclaration(Map<Dependency, List<Integer>> multipleDeclaration) {
+    Iterator<Dependency> iterator = multipleDeclaration.keySet().iterator();
+    while (iterator.hasNext()) {
+      Dependency dependency = iterator.next();
+      getLog().info("\tDependency : " + StringUtils.stripEnd(dependency.getManagementKey(), ":"));
+      for (Integer line : multipleDeclaration.get(dependency)) {
+        getLog().info("\t\t\tLine declaration : " + line);
       }
     }
   }
@@ -529,7 +563,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     writer = writeDependencyXML(usedUndeclared, writer, false);
     writer.endElement();
 
-    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched()) {
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatches()) {
       writer = writeMismatch(mismatchDepMgtModel.getMismatch(), writer);
       writer = writeExclusionErrors(mismatchDepMgtModel.getExclusionErrors(), writer);
     }
@@ -628,7 +662,6 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     if (resolvedArtifact == null || depMgtDependency == null) {
       return writer;
     }
-    logMismatch(resolvedArtifact, depMgtDependency);
     writer.startElement("dependency");
     writer.startElement("groupId");
     writer.writeText(depMgtDependency.getGroupId());
@@ -722,13 +755,17 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       sink.link_();
       sink.listItem_();
       sink.listItem();
-      sink.link("unuseddeclared");
-      sink.text(getI18nString(locale, "unuseddeclared.description"));
+      sink.link("usedundeclared");
+      sink.text(getI18nString(locale, "usedundeclared.description"));
       sink.link_();
       sink.listItem_();
       sink.listItem();
-      sink.link("usedundeclared");
-      sink.text(getI18nString(locale, "usedundeclared.description"));
+      if (ignoreNonCompile) {
+        sink.link("unuseddeclared.ignoreall");
+      } else {
+        sink.link("unuseddeclared");
+      }
+      sink.text(getI18nString(locale, "unuseddeclared.description"));
       sink.link_();
       sink.listItem_();
       sink.listItem();
@@ -747,26 +784,27 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       sink.link_();
       sink.listItem_();
       sink.list_();
-      // usedDeclared, unusedDeclared, usedUndeclared, mismatchDepMgtModel,
-      // checkUniqueDeclaration
 
       writeSection(sink, usedDeclared, "useddeclared", locale, true);
       writeSection(sink, usedUndeclared, "usedundeclared", locale, false);
-      writeSection(sink, unusedDeclared, "unuseddeclared", locale, true);
+      if (ignoreNonCompile) {
+        writeSection(sink, unusedDeclared, "unuseddeclared.ignoreall", locale, true);
+      } else {
+        writeSection(sink, unusedDeclared, "unuseddeclared", locale, true);
+      }
 
       writeOverridenVersion(sink, locale);
 
       writeMultipleDeclaration(sink, locale);
 
-      // TODO ecrire les exclusions errors
+      writeExclusionError(sink, locale);
 
-//      sink.text(dependenciesResult.toString());
       sink.body_();
       sink.flush();
       sink.close();
 
     } catch (MojoExecutionException e) {
-      // TODO Auto-generated catch block
+      e.printStackTrace();
       throw new MavenReportException("MavenReportException", e);
     }
 
@@ -833,7 +871,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
         sink.table_();
         sink.tableCell_();
         sink.tableRow_();
-        
+
       }
       sink.table_();
     } else {
@@ -841,10 +879,37 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     }
     writeEnd(sink);
   }
-  
+
+  private void writeExclusionError(Sink sink, Locale locale) {
+    writeBegin(sink, "exclusions", locale);
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasExclusionErrors()) {
+      List<Artifact> exclusionErrors = mismatchDepMgtModel.getExclusionErrors();
+      sink.table();
+      writeHeaderCell(sink, getI18nString(locale, "groupid"));
+      writeHeaderCell(sink, getI18nString(locale, "artifactid"));
+      writeHeaderCell(sink, getI18nString(locale, "versionFound"));
+      for (Artifact exclusion : exclusionErrors) {
+        sink.tableRow();
+        writeCell(sink, exclusion.getGroupId());
+        writeCell(sink, exclusion.getArtifactId());
+        writeCell(sink, exclusion.getVersion());
+        sink.tableRow_();
+      }
+      sink.table_();
+    } else {
+      sink.text(getI18nString(locale, "noentry"));
+    }
+    writeEnd(sink);
+  }
+
   private void writeOverridenVersion(Sink sink, Locale locale) {
     writeBegin(sink, "overriden", locale);
-    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatched()) {
+    if (ignoreDirect) {
+      sink.paragraph();
+      sink.text(getI18nString(locale, "overriden.ignoredirect"));
+      sink.paragraph_();
+    }
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatches()) {
       sink.table();
       writeHeaderCell(sink, getI18nString(locale, "groupid"));
       writeHeaderCell(sink, getI18nString(locale, "artifactid"));

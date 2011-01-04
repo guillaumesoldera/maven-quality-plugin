@@ -28,12 +28,18 @@ public class MismatchDepMgtModel {
     this.exclusionErrors = exclusionErrors;
   }
   
-  public boolean hasMismatched() {
+  public boolean hasMismatches() {
     boolean result = false;
     
     if (mismatch != null && mismatch.size() > 0) {
       result = true;
     }
+    return result;
+  }
+  
+  public boolean hasExclusionErrors() {
+    boolean result = false;
+    
     if (exclusionErrors != null && exclusionErrors.size() > 0) {
       result = true;
     }
