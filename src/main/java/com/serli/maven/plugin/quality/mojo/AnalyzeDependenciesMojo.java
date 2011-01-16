@@ -170,16 +170,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       f.mkdirs();
     }
 
-    File output = outputFile;
-    if (output != null && !output.exists()) {
-      int lastPathSeparator = outputFile.getPath().lastIndexOf(File.separatorChar);
-      if (lastPathSeparator != -1) {
-        String directoryPath = outputFile.getPath().substring(0, lastPathSeparator);
-        File directory = new File(directoryPath);
-        directory.mkdirs();
-      }
-      output = new File(outputFile.getPath());
-    }
+    Util.buildOutputFile(outputFile);
 
     boolean warningDep;
     try {
@@ -200,6 +191,8 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
     getLog().info("results are available in " + outputFile.getPath());
   }
+
+  
 
   // private methods --------------------------------------------------------
 
@@ -940,34 +933,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     writeEnd(sink);
   }
 
-  private void writeCell(Sink sink, String contents) {
-    sink.tableCell();
-    sink.text(contents);
-    sink.tableCell_();
-  }
-
-  private void writeHeaderCell(Sink sink, String contents) {
-    sink.tableHeaderCell();
-    sink.text(contents);
-    sink.tableHeaderCell_();
-  }
-
-  private void writeEnd(Sink sink) {
-    sink.section1_();
-  }
-
-  private void writeBegin(Sink sink, String key, Locale locale) {
-    sink.section1();
-    sink.sectionTitle1();
-    sink.anchor(key);
-    sink.text(getI18nString(locale, key + ".name"));
-    sink.anchor_();
-    sink.sectionTitle1_();
-    sink.paragraph();
-    sink.text(getI18nString(locale, key + ".description"));
-    sink.paragraph_();
-  }
-
+  
   /** {@inheritDoc} */
   public String getOutputName() {
     return "dependencies-analysis";

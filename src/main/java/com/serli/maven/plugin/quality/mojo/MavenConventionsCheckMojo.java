@@ -7,12 +7,13 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import javax.xml.bind.JAXBException;
 
-import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.doxia.sink.Sink;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.reporting.MavenReportException;
 import org.codehaus.plexus.util.xml.PrettyPrintXMLWriter;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
@@ -30,7 +31,7 @@ import com.serli.maven.plugin.quality.util.Util;
  * @requiresDependencyResolution test
  * @phase verify
  */
-public class MavenConventionsCheckMojo extends AbstractMojo {
+public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
 
   /**
    * Location of the file.
@@ -60,19 +61,13 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
    * Output file.
    * 
    * @parameter expression="${outputFile}"
+   *            default-value="target/reports/maven-conventions-check.xml"
    */
   private File outputFile;
 
-  /**
-   * The Maven project to analyze.
-   * 
-   * @parameter expression="${project}"
-   * @required
-   * @readonly
-   */
-//  private MavenProject project;
+  private List<MavenConventionsViolation> listViolation;
 
-  public void execute() throws MojoExecutionException, MojoFailureException {
+  public void execution() throws MojoExecutionException {
 
     File f = outputDirectory;
 
@@ -84,6 +79,9 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
       getLog().info("Skipping project with no build directory");
       return;
     }
+    
+    Util.buildOutputFile(outputFile);
+    
     try {
       MavenConventions conventions = Util.getMavenConventions(mavenConventions);
       File pom = new File("pom.xml");
@@ -91,14 +89,13 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
       PomFileReader pomFileReader = new PomFileReader(getLog());
 
       reader = new FileReader(pom);
-      List<MavenConventionsViolation> listViolation = pomFileReader.checkMavenConventions(reader, true, true, conventions);
-      
+      listViolation = pomFileReader.checkMavenConventions(reader, true, true, conventions);
+
       if (listViolation != null) {
         if (outputXML) {
           StringBuffer writeViolation = writeConventionsViolation(listViolation);
           Util.writeFile(writeViolation.toString(), outputFile, getLog());
         } else {
-
           for (MavenConventionsViolation violation : listViolation) {
             getLog().info(violation.getMessage());
           }
@@ -110,42 +107,41 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
     } catch (JAXBException e1) {
       throw new MojoExecutionException(e1.getMessage());
     } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      throw new MojoExecutionException(e.getMessage());
     } catch (IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      throw new MojoExecutionException(e.getMessage());
     } catch (XmlPullParserException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      throw new MojoExecutionException(e.getMessage());
     }
 
   }
-  
+
   private StringBuffer writeConventionsViolation(List<MavenConventionsViolation> listViolation) {
     StringWriter out = new StringWriter();
     PrettyPrintXMLWriter writer = new PrettyPrintXMLWriter(out);
     writer.startElement("mavenConventionsViolation");
-    List<StructureConventionsViolation> listStructureConventionsViolations = getStructureConventionsViolations(listViolation);
-    List<NamingConventionsViolation> listNamingConventionsViolations = getNamingConventionsViolations(listViolation);
+    List<MavenConventionsViolation> listStructureConventionsViolations = getStructureConventionsViolations(listViolation);
+    List<MavenConventionsViolation> listNamingConventionsViolations = getNamingConventionsViolations(listViolation);
     writer = writeFormattingViolation(listStructureConventionsViolations, writer);
     writer = writeNamingViolation(listNamingConventionsViolations, writer);
     writer.endElement();
     return out.getBuffer();
   }
 
-  private PrettyPrintXMLWriter writeNamingViolation(List<NamingConventionsViolation> listNamingConventionsViolations, PrettyPrintXMLWriter writer) {
+  private PrettyPrintXMLWriter writeNamingViolation(List<MavenConventionsViolation> listNamingConventionsViolations,
+      PrettyPrintXMLWriter writer) {
     writer.startElement("namingViolations");
-    for (NamingConventionsViolation violation : listNamingConventionsViolations) {
+    for (MavenConventionsViolation violation : listNamingConventionsViolations) {
       writer = writeMavenConventionsViolation(writer, violation);
     }
     writer.endElement();
     return writer;
   }
-  
-  private PrettyPrintXMLWriter writeFormattingViolation(List<StructureConventionsViolation> listStructureConventionsViolations, PrettyPrintXMLWriter writer) {
+
+  private PrettyPrintXMLWriter writeFormattingViolation(List<MavenConventionsViolation> listStructureConventionsViolations,
+      PrettyPrintXMLWriter writer) {
     writer.startElement("formattingViolations");
-    for (StructureConventionsViolation violation : listStructureConventionsViolations) {
+    for (MavenConventionsViolation violation : listStructureConventionsViolations) {
       writer = writeMavenConventionsViolation(writer, violation);
     }
     writer.endElement();
@@ -168,29 +164,112 @@ public class MavenConventionsCheckMojo extends AbstractMojo {
     }
     return writer;
   }
-  
-  private List<StructureConventionsViolation> getStructureConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
-    List<StructureConventionsViolation> structureConventionsViolations = new ArrayList<StructureConventionsViolation>();
-    
+
+  private List<MavenConventionsViolation> getStructureConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
+    List<MavenConventionsViolation> structureConventionsViolations = new ArrayList<MavenConventionsViolation>();
+
     for (MavenConventionsViolation violations : mavenConventionsViolations) {
       if (violations instanceof StructureConventionsViolation) {
         structureConventionsViolations.add((StructureConventionsViolation) violations);
       }
     }
-    
+
     return structureConventionsViolations;
   }
-  
-  private List<NamingConventionsViolation> getNamingConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
-    List<NamingConventionsViolation> namingConventionsViolations = new ArrayList<NamingConventionsViolation>();
-    
+
+  private List<MavenConventionsViolation> getNamingConventionsViolations(List<MavenConventionsViolation> mavenConventionsViolations) {
+    List<MavenConventionsViolation> namingConventionsViolations = new ArrayList<MavenConventionsViolation>();
+
     for (MavenConventionsViolation violations : mavenConventionsViolations) {
       if (violations instanceof NamingConventionsViolation) {
         namingConventionsViolations.add((NamingConventionsViolation) violations);
       }
     }
-    
+
     return namingConventionsViolations;
   }
-  
+
+  public String getOutputName() {
+    return "maven-convention-check";
+  }
+
+  @Override
+  protected String getI18Nsection() {
+    return "mavenconventions";
+  }
+
+  @Override
+  protected void executeReport(Locale locale) throws MavenReportException {
+    outputReportDirectory.mkdirs();
+
+    try {
+      execution();
+
+      Sink sink = getSink();
+      sink.head();
+      sink.title();
+      sink.text(getOutputName());
+      sink.title_();
+      sink.head_();
+
+      sink.body();
+      sink.paragraph();
+      sink.text(getDescription(locale));
+      sink.paragraph_();
+      sink.text(getI18nString(locale, "intro"));
+
+      if (listViolation != null) {
+        sink.list();
+        sink.listItem();
+        sink.link("formattingviolations");
+        sink.text(getI18nString(locale, "formattingviolations.name"));
+        sink.link_();
+        sink.listItem_();
+        sink.listItem();
+        sink.link("namingviolations");
+        sink.text(getI18nString(locale, "namingviolations.name"));
+        sink.link_();
+        sink.listItem_();
+        sink.list_();
+        List<MavenConventionsViolation> structureConventionsViolations = getStructureConventionsViolations(listViolation);
+        List<MavenConventionsViolation> namingConventionsViolations = getNamingConventionsViolations(listViolation);
+        writeSection(sink, "formattingviolations", locale, structureConventionsViolations);
+        writeSection(sink, "namingviolations", locale, namingConventionsViolations);
+      } else {
+        sink.text(getI18nString(locale, "noviolation"));
+      }
+
+      sink.body_();
+      sink.flush();
+      sink.close();
+
+    } catch (MojoExecutionException e) {
+      throw new MavenReportException(e.getMessage(), e);
+    }
+
+  }
+
+  private void writeSection(Sink sink, String key, Locale locale, List<MavenConventionsViolation> listConventionViolation) {
+    writeBegin(sink, key, locale);
+
+    if (listConventionViolation != null && !listConventionViolation.isEmpty()) {
+      sink.table();
+      writeHeaderCell(sink, getI18nString(locale, "tag"));
+      writeHeaderCell(sink, getI18nString(locale, "message"));
+      writeHeaderCell(sink, getI18nString(locale, "linenumber"));
+      for (MavenConventionsViolation violation : listConventionViolation) {
+        sink.tableRow();
+        writeCell(sink, violation.getTagName());
+        writeCell(sink, violation.getMessage());
+        writeCell(sink, violation.getLineNumber() + "");
+        sink.tableRow_();
+      }
+      sink.table_();
+    } else {
+      sink.text(getI18nString(locale, "noviolation"));
+    }
+
+    writeEnd(sink);
+  }
+
 }

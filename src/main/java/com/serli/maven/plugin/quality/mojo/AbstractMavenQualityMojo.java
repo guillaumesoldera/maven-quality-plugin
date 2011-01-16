@@ -20,6 +20,7 @@ package com.serli.maven.plugin.quality.mojo;
 import java.io.File;
 import java.util.Locale;
 
+import org.apache.maven.doxia.sink.Sink;
 import org.apache.maven.doxia.siterenderer.Renderer;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
@@ -104,6 +105,34 @@ public abstract class AbstractMavenQualityMojo extends AbstractMavenReport {
   @Override
   public String getCategoryName() {
     return super.getCategoryName();
+  }
+
+  protected void writeCell(Sink sink, String contents) {
+    sink.tableCell();
+    sink.text(contents);
+    sink.tableCell_();
+  }
+
+  protected void writeHeaderCell(Sink sink, String contents) {
+    sink.tableHeaderCell();
+    sink.text(contents);
+    sink.tableHeaderCell_();
+  }
+
+  protected void writeEnd(Sink sink) {
+    sink.section1_();
+  }
+
+  protected void writeBegin(Sink sink, String key, Locale locale) {
+    sink.section1();
+    sink.sectionTitle1();
+    sink.anchor(key);
+    sink.text(getI18nString(locale, key + ".name"));
+    sink.anchor_();
+    sink.sectionTitle1_();
+    sink.paragraph();
+    sink.text(getI18nString(locale, key + ".description"));
+    sink.paragraph_();
   }
 
 }

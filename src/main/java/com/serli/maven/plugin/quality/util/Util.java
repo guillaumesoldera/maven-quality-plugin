@@ -26,6 +26,7 @@ import com.serli.maven.plugin.quality.model.jaxb.FormattingConventions;
 import com.serli.maven.plugin.quality.model.jaxb.Group;
 import com.serli.maven.plugin.quality.model.jaxb.MavenConventions;
 import com.serli.maven.plugin.quality.model.jaxb.Tag;
+import com.serli.maven.plugin.quality.mojo.MavenConventionsCheckMojo;
 
 public final class Util {
 
@@ -82,6 +83,11 @@ public final class Util {
     JAXBContext jc = JAXBContext.newInstance(new Class[] { MavenConventions.class, FormattingConventions.class, Group.class, Tag.class });
     Unmarshaller unmarshaller = jc.createUnmarshaller();
     InputStream mavenConventions = Thread.currentThread().getContextClassLoader().getResourceAsStream(conventionsMavenFileName);
+    
+    // work around for mvn site
+    if (mavenConventions == null) {
+      mavenConventions = MavenConventionsCheckMojo.class.getClassLoader().getResourceAsStream(conventionsMavenFileName);
+    }
     MavenConventions conventions = (MavenConventions) unmarshaller.unmarshal(mavenConventions);
     return conventions;
   }
@@ -174,5 +180,18 @@ public final class Util {
       result.add(isoCountry.toLowerCase());
     }
     return result;
+  }
+  
+  public static void buildOutputFile(File outputFile) {
+    File output = outputFile;
+    if (output != null && !output.exists()) {
+      int lastPathSeparator = outputFile.getPath().lastIndexOf(File.separatorChar);
+      if (lastPathSeparator != -1) {
+        String directoryPath = outputFile.getPath().substring(0, lastPathSeparator);
+        File directory = new File(directoryPath);
+        directory.mkdirs();
+      }
+      output = new File(outputFile.getPath());
+    }
   }
 }
