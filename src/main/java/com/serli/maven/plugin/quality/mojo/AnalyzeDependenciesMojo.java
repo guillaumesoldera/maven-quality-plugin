@@ -77,8 +77,6 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
   /**
    * Output file.
    * 
-   * @parameter expression="${outputFile}"
-   *            default-value="target/reports/dependencies-analysis.xml"
    */
   private File outputFile;
 
@@ -127,7 +125,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
   /**
    * Print results in log console.
    * 
-   * @parameter expression="${logConsole}" default-value="true"
+   * @parameter expression="${logConsole}" default-value="false"
    */
   private boolean logConsole;
 
@@ -169,7 +167,8 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     if (!f.exists()) {
       f.mkdirs();
     }
-
+    outputFile = new File(outputDirectory, "reports/dependencies-analysis.xml");
+    
     Util.buildOutputFile(outputFile);
 
     boolean warningDep;

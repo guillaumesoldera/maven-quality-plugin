@@ -53,15 +53,13 @@ public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
   /**
    * Output the xml for the dependencies analyze report.
    * 
-   * @parameter expression="${outputXML}" default-value="true"
+   * @parameter expression="${logConsole}" default-value="false"
    */
-  private boolean outputXML;
+  private boolean logConsole;
 
   /**
    * Output file.
    * 
-   * @parameter expression="${outputFile}"
-   *            default-value="target/reports/maven-conventions-check.xml"
    */
   private File outputFile;
 
@@ -79,9 +77,10 @@ public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
       getLog().info("Skipping project with no build directory");
       return;
     }
-    
+
+    outputFile = new File(outputDirectory, "reports/maven-conventions-check.xml");
     Util.buildOutputFile(outputFile);
-    
+
     try {
       MavenConventions conventions = Util.getMavenConventions(mavenConventions);
       File pom = new File("pom.xml");
@@ -92,13 +91,15 @@ public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
       listViolation = pomFileReader.checkMavenConventions(reader, true, true, conventions);
 
       if (listViolation != null) {
-        if (outputXML) {
-          StringBuffer writeViolation = writeConventionsViolation(listViolation);
-          Util.writeFile(writeViolation.toString(), outputFile, getLog());
-        } else {
+        StringBuffer writeViolation = writeConventionsViolation(listViolation);
+        Util.writeFile(writeViolation.toString(), outputFile, getLog());
+        if (logConsole) {
           for (MavenConventionsViolation violation : listViolation) {
             getLog().info(violation.getMessage());
           }
+        }
+        if (listViolation.size() == 0) {
+          getLog().info("No violations found");
         }
       } else {
         getLog().info("No violations found");
@@ -113,7 +114,7 @@ public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
     } catch (XmlPullParserException e) {
       throw new MojoExecutionException(e.getMessage());
     }
-
+    getLog().info("results are available in " + outputFile.getPath());
   }
 
   private StringBuffer writeConventionsViolation(List<MavenConventionsViolation> listViolation) {
