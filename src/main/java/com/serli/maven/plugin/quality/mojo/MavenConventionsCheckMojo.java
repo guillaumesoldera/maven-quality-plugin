@@ -82,7 +82,7 @@ public class MavenConventionsCheckMojo extends AbstractMavenQualityMojo {
     Util.buildOutputFile(outputFile);
 
     try {
-      MavenConventions conventions = Util.getMavenConventions(mavenConventions);
+      MavenConventions conventions = Util.getMavenConventions(mavenConventions, this.getClass());
       File pom = new File("pom.xml");
       FileReader reader;
       PomFileReader pomFileReader = new PomFileReader(getLog());

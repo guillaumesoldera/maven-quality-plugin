@@ -79,14 +79,13 @@ public final class Util {
     return getLastDefinitionLine(dependencyLocationList, dependency);
   }
 
-  public static MavenConventions getMavenConventions(String conventionsMavenFileName) throws JAXBException {
+  public static MavenConventions getMavenConventions(String conventionsMavenFileName, Class clazz) throws JAXBException {
     JAXBContext jc = JAXBContext.newInstance(new Class[] { MavenConventions.class, FormattingConventions.class, Group.class, Tag.class });
     Unmarshaller unmarshaller = jc.createUnmarshaller();
     InputStream mavenConventions = Thread.currentThread().getContextClassLoader().getResourceAsStream(conventionsMavenFileName);
-    
     // work around for mvn site
     if (mavenConventions == null) {
-      mavenConventions = MavenConventionsCheckMojo.class.getClassLoader().getResourceAsStream(conventionsMavenFileName);
+      mavenConventions = clazz.getClassLoader().getResourceAsStream(conventionsMavenFileName);
     }
     MavenConventions conventions = (MavenConventions) unmarshaller.unmarshal(mavenConventions);
     return conventions;

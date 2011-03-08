@@ -28,10 +28,10 @@ public class MismatchDepMgtModel {
     this.exclusionErrors = exclusionErrors;
   }
   
-  public boolean hasMismatches() {
+  public boolean canIterate() {
     boolean result = false;
     
-    if (mismatch != null && mismatch.size() > 0) {
+    if (mismatch != null) {
       result = true;
     }
     return result;

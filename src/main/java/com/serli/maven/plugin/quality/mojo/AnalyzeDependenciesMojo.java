@@ -88,7 +88,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
   private boolean failOnWarning;
 
   /**
-   * Ignore Runtime,Provide,Test,System scopes for unused dependency analysis
+   * Ignore Runtime,Provide,Test, System scopes for unused dependency analysis
    * 
    * @parameter expression="${ignoreNonCompile}" default-value="false"
    */
@@ -309,7 +309,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       }
     }
 
-    boolean hasMismatch = (mismatchDepMgtModel != null && (mismatchDepMgtModel.hasMismatches() || mismatchDepMgtModel.hasExclusionErrors()));
+    boolean hasMismatch = (mismatchDepMgtModel != null && (mismatchDepMgtModel.canIterate() || mismatchDepMgtModel.hasExclusionErrors()));
     boolean multipleDeclaration = checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty();
 
     boolean result = !usedUndeclared.isEmpty() || !unusedDeclared.isEmpty();
@@ -331,7 +331,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
   @SuppressWarnings("unchecked")
   private MismatchDepMgtModel checkDependencyManagement() throws MojoExecutionException {
     MismatchDepMgtModel mismatchDepMgtModel = new MismatchDepMgtModel();
-    Map<Artifact, Dependency> mismatch = null;
+    Map<Artifact, Dependency> mismatch = new HashMap<Artifact, Dependency>();
     List<Artifact> exclusionErrors = null;
     getLog().info("Found Resolved Dependency / DependencyManagement mismatches:");
 
@@ -379,7 +379,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
 
       // find and log version mismatches
       mismatch = getMismatch(depMgtMap, allDependencyArtifacts);
-
+     
       if (logConsole && !outputXML) {
         Iterator<Artifact> mismatchIter = mismatch.keySet().iterator();
         while (mismatchIter.hasNext()) {
@@ -555,27 +555,26 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
     writer = writeDependencyXML(usedUndeclared, writer, false);
     writer.endElement();
 
-    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatches()) {
+    // TODO marquer à chaque fois même si c'est vide
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.canIterate()) {
       writer = writeMismatch(mismatchDepMgtModel.getMismatch(), writer);
       writer = writeExclusionErrors(mismatchDepMgtModel.getExclusionErrors(), writer);
     }
 
-    if (checkUniqueDeclaration != null && !checkUniqueDeclaration.isEmpty()) {
-      writer = writeMultipleDeclaration(checkUniqueDeclaration, writer);
-    }
+    writer = writeMultipleDeclaration(checkUniqueDeclaration, writer);
 
     writer.endElement();
     return out.getBuffer();
   }
 
   private PrettyPrintXMLWriter writeMultipleDeclaration(Map<Dependency, List<Integer>> checkUniqueDeclaration, PrettyPrintXMLWriter writer) {
+    writer.startElement("multipleDeclaration");
     if (checkUniqueDeclaration != null) {
-      writer.startElement("multipleDeclaration");
       for (Dependency dep : checkUniqueDeclaration.keySet()) {
         writer = writeMultipleDeclaration(dep, checkUniqueDeclaration.get(dep), writer);
       }
-      writer.endElement();
     }
+    writer.endElement();
 
     return writer;
   }
@@ -601,8 +600,8 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
   }
 
   private PrettyPrintXMLWriter writeExclusionErrors(List<Artifact> exclusionErrors, PrettyPrintXMLWriter writer) {
+    writer.startElement("exclusionErrors");
     if (exclusionErrors != null) {
-      writer.startElement("exclusionErrors");
       Iterator<Artifact> exclusionIter = exclusionErrors.iterator();
       while (exclusionIter.hasNext()) {
         Artifact exclusion = (Artifact) exclusionIter.next();
@@ -612,8 +611,8 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
                 + exclusion.getVersion() + " has been found in the dependency tree.");
 
       }
-      writer.endElement();
     }
+    writer.endElement();
 
     return writer;
   }
@@ -901,7 +900,7 @@ public class AnalyzeDependenciesMojo extends AbstractMavenQualityMojo {
       sink.text(getI18nString(locale, "overriden.ignoredirect"));
       sink.paragraph_();
     }
-    if (mismatchDepMgtModel != null && mismatchDepMgtModel.hasMismatches()) {
+    if (mismatchDepMgtModel != null && mismatchDepMgtModel.canIterate()) {
       sink.table();
       writeHeaderCell(sink, getI18nString(locale, "groupid"));
       writeHeaderCell(sink, getI18nString(locale, "artifactid"));

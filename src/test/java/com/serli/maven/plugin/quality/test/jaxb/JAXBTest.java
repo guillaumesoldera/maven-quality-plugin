@@ -9,14 +9,16 @@ import junit.framework.TestCase;
 import com.serli.maven.plugin.quality.model.jaxb.Group;
 import com.serli.maven.plugin.quality.model.jaxb.MavenConventions;
 import com.serli.maven.plugin.quality.model.jaxb.Tag;
+import com.serli.maven.plugin.quality.mojo.MavenConventionsCheckMojo;
 import com.serli.maven.plugin.quality.util.Util;
 
 public class JAXBTest extends TestCase {
 
 
   public void testUnMarshall() {
-    try {
-      MavenConventions conventions = Util.getMavenConventions("maven-conventions.xml");
+      Class clazz = MavenConventionsCheckMojo.class;
+      try {
+      MavenConventions conventions = Util.getMavenConventions("maven-conventions.xml", clazz);
       assertNotNull(conventions);
       List<Tag> listTags = conventions.getListTags();
       assertNotNull(listTags);
